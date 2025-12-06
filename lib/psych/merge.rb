@@ -5,6 +5,9 @@ require "psych"
 require "version_gem"
 require "set"
 
+# Shared merge infrastructure
+require "ast/merge"
+
 # This gem
 require_relative "merge/version"
 

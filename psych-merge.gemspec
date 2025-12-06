@@ -38,6 +38,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Runtime dependencies
+  spec.add_dependency "ast-merge", "~> 1.0"                              # ruby >= 3.2.0, shared merge infrastructure
   spec.add_dependency "psych", ">= 5.0.1"
   spec.add_dependency "version_gem", ">= 1.1.4", "< 3"
 
