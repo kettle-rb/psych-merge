@@ -14,7 +14,8 @@ PATH
   remote: .
   specs:
     psych-merge (1.0.0)
-      kettle-dev (~> 1.1.60)
+      psych (>= 5.0.1)
+      version_gem (>= 1.1.4, < 3)
 
 GEM
   remote: https://gem.coop/
