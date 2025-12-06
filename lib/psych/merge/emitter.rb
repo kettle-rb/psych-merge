@@ -198,10 +198,10 @@ module Psych
         return true if str.empty?
 
         # Check for special characters that need quoting
-        return true if str =~ /^[&*!|>'"%@`]/
-        return true if str =~ /[:#\[\]{}?,]/
-        return true if str =~ /^\s|\s$/
-        return true if str =~ /\n/
+        return true if /^[&*!|>'"%@`]/.match?(str)
+        return true if /[:#\[\]{}?,]/.match?(str)
+        return true if /^\s|\s$/.match?(str)
+        return true if /\n/.match?(str)
 
         # Check for boolean/null-like values
         return true if %w[true false yes no on off null ~].include?(str.downcase)

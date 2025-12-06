@@ -1,6 +1,231 @@
+# Type signatures for psych-merge gem
+# Smart merge for YAML files using Psych AST analysis
+
 module Psych
   module Merge
     VERSION: String
-    # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+
+    # Base error class for psych-merge errors
+    class Error < StandardError
+    end
+
+    # Error raised when template YAML file has syntax errors
+    class TemplateParseError < Error
+      attr_reader errors: Array[untyped]
+      attr_reader content: String?
+
+      def initialize: (?String? message, ?errors: Array[untyped], ?content: String?) -> void
+    end
+
+    # Error raised when destination YAML file has syntax errors
+    class DestinationParseError < Error
+      attr_reader errors: Array[untyped]
+      attr_reader content: String?
+
+      def initialize: (?String? message, ?errors: Array[untyped], ?content: String?) -> void
+    end
+
+    # Debug logging utility for Psych::Merge
+    module DebugLogger
+      extend Ast::Merge::DebugLogger
+
+      def self.env_var_name: () -> String
+      def self.env_var_name=: (String name) -> String
+      def self.log_prefix: () -> String
+      def self.log_prefix=: (String prefix) -> String
+      def self.enabled?: () -> bool
+      def self.debug: (String message, ?Hash[Symbol, untyped] context) -> void
+      def self.info: (String message) -> void
+      def self.warning: (String message) -> void
+      def self.time: [T] (String operation) { () -> T } -> T
+      def self.extract_node_info: (untyped node) -> Hash[Symbol, untyped]
+    end
+
+    # Freeze block node for YAML files
+    class FreezeNode < Ast::Merge::FreezeNode
+      InvalidStructureError: singleton(Ast::Merge::FreezeNode::InvalidStructureError)
+      Location: singleton(Ast::Merge::FreezeNode::Location)
+
+      attr_reader lines: Array[String]
+      attr_reader nodes: Array[untyped]
+
+      def initialize: (
+        start_line: Integer,
+        end_line: Integer,
+        ?lines: Array[String]?,
+        ?analysis: FileAnalysis?,
+        ?content: String?,
+        ?nodes: Array[untyped],
+        ?overlapping_nodes: Array[untyped]?,
+        ?start_marker: String?,
+        ?end_marker: String?,
+        ?pattern_type: Symbol,
+        ?reason: String?
+      ) -> void
+
+      def signature: () -> Array[Symbol | String]
+      def mapping?: () -> bool
+      def sequence?: () -> bool
+      def scalar?: () -> bool
+      def slice: () -> String?
+      def inspect: () -> String
+    end
+
+    # Wrapper for Psych AST nodes
+    class NodeWrapper
+      attr_reader node: untyped
+      attr_reader start_line: Integer
+      attr_reader end_line: Integer
+      attr_reader analysis: FileAnalysis?
+
+      def initialize: (
+        untyped node,
+        ?start_line: Integer?,
+        ?end_line: Integer?,
+        ?analysis: FileAnalysis?
+      ) -> void
+
+      def location: () -> Ast::Merge::FreezeNode::Location
+      def signature: () -> Array[untyped]
+      def freeze_node?: () -> bool
+      def mapping?: () -> bool
+      def sequence?: () -> bool
+      def scalar?: () -> bool
+      def slice: () -> String?
+      def key: () -> String?
+      def value: () -> untyped
+      def inspect: () -> String
+    end
+
+    # File analysis for YAML files
+    class FileAnalysis
+      include Ast::Merge::FileAnalysisBase
+
+      DEFAULT_FREEZE_TOKEN: String
+
+      attr_reader source: String
+      attr_reader lines: Array[String]
+      attr_reader ast: untyped
+      attr_reader statements: Array[NodeWrapper | FreezeNode]
+      attr_reader freeze_blocks: Array[FreezeNode]
+      attr_reader freeze_token: String
+      attr_reader signature_generator: (^(untyped) -> Array[untyped]?)?
+      attr_reader errors: Array[untyped]
+
+      def initialize: (
+        String source,
+        ?freeze_token: String,
+        ?signature_generator: (^(untyped) -> Array[untyped]?)?
+      ) -> void
+
+      def valid?: () -> bool
+      def nodes: () -> Array[NodeWrapper | FreezeNode]
+      def line_at: (Integer line_num) -> String?
+      def normalized_line: (Integer line_num) -> String?
+      def in_freeze_block?: (Integer line_num) -> bool
+      def freeze_block_at: (Integer line_num) -> FreezeNode?
+      def signature_at: (Integer index) -> Array[untyped]?
+      def generate_signature: (untyped node) -> Array[untyped]?
+      def compute_node_signature: (untyped node) -> Array[untyped]?
+
+      private
+
+      def parse_yaml: () -> void
+      def extract_nodes: () -> Array[NodeWrapper]
+      def extract_freeze_blocks: () -> Array[FreezeNode]
+      def integrate_nodes_and_freeze_blocks: () -> Array[NodeWrapper | FreezeNode]
+    end
+
+    # Result of a YAML merge operation
+    class MergeResult < Ast::Merge::MergeResult
+      DECISION_KEPT_TEMPLATE: Symbol
+      DECISION_KEPT_DEST: Symbol
+      DECISION_MERGED: Symbol
+      DECISION_ADDED: Symbol
+      DECISION_FREEZE_BLOCK: Symbol
+      DECISION_REPLACED: Symbol
+      DECISION_APPENDED: Symbol
+
+      attr_reader lines: Array[String]
+      attr_reader decisions: Array[Hash[Symbol, untyped]]
+      attr_reader statistics: Hash[Symbol, Integer]
+
+      def initialize: (
+        ?template_analysis: FileAnalysis?,
+        ?dest_analysis: FileAnalysis?,
+        ?conflicts: Array[Hash[Symbol, untyped]],
+        ?frozen_blocks: Array[FreezeNode],
+        ?stats: Hash[Symbol, untyped]
+      ) -> void
+
+      def add_line: (
+        String line,
+        decision: Symbol,
+        source: Symbol,
+        ?original_line: Integer?
+      ) -> void
+
+      def add_lines: (
+        Array[String] lines,
+        decision: Symbol,
+        source: Symbol,
+        ?start_line: Integer?
+      ) -> void
+
+      def add_blank_line: (?decision: Symbol, ?source: Symbol) -> void
+      def add_freeze_block: (FreezeNode freeze_node) -> void
+      def to_yaml: () -> String
+      def content: () -> Array[String]
+      def content_string: () -> String
+      def empty?: () -> bool
+
+      private
+
+      def track_statistics: (Symbol decision, Symbol source) -> void
+    end
+
+    # Smart merger for YAML files
+    class SmartMerger
+      include Ast::Merge::MergerConfig
+
+      attr_reader template_analysis: FileAnalysis
+      attr_reader dest_analysis: FileAnalysis
+      attr_reader signature_match_preference: (Symbol | Hash[Symbol, Symbol])
+      attr_reader add_template_only_nodes: bool
+
+      def initialize: (
+        String template_content,
+        String dest_content,
+        ?signature_match_preference: (Symbol | Hash[Symbol, Symbol]),
+        ?add_template_only_nodes: bool,
+        ?freeze_token: String,
+        ?signature_generator: (^(untyped) -> Array[untyped]?)?,
+        ?node_splitter: (Hash[Symbol, untyped])?
+      ) -> void
+
+      def merge: () -> MergeResult
+
+      private
+
+      def perform_merge: () -> MergeResult
+      def merge_nodes: (MergeResult result) -> void
+    end
+
+    # Conflict resolver for YAML merges
+    class ConflictResolver
+      attr_reader template_analysis: FileAnalysis
+      attr_reader dest_analysis: FileAnalysis
+      attr_reader signature_match_preference: (Symbol | Hash[Symbol, Symbol])
+      attr_reader add_template_only_nodes: bool
+
+      def initialize: (
+        FileAnalysis template_analysis,
+        FileAnalysis dest_analysis,
+        ?signature_match_preference: (Symbol | Hash[Symbol, Symbol]),
+        ?add_template_only_nodes: bool
+      ) -> void
+
+      def resolve: (untyped boundary, MergeResult result) -> void
+    end
   end
 end

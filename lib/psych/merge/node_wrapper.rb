@@ -43,9 +43,26 @@ module Psych
         @inline_comment = inline_comment
         @key = key
 
-        # Extract line information from the Psych node
+        # Extract line information from the Psych node.
+        #
+        # IMPORTANT: Psych (libyaml) line number semantics:
+        # - start_line: 0-based, inclusive (first line of the node's content)
+        # - end_line: 0-based, EXCLUSIVE (points to the line AFTER the last content line)
+        #
+        # Example for a mapping value spanning lines 4-5 (1-based):
+        #   Psych reports: start_line=3, end_line=5 (0-based)
+        #   - start_line=3 means line 4 (1-based) - correct
+        #   - end_line=5 means "up to but not including line 5 (0-based)",
+        #     i.e., last included line is 4 (0-based) = line 5 (1-based)
+        #
+        # Conversion to 1-based inclusive range:
+        # - @start_line = node.start_line + 1  (0-based inclusive → 1-based inclusive)
+        # - @end_line = node.end_line          (0-based exclusive → 1-based inclusive, since exclusive-1+1=same)
+        #
+        # If Psych/libyaml ever changes end_line to be inclusive, this will need adjustment.
+        # See regression test: "does not duplicate keys when destination adds a new nested mapping"
         @start_line = node.start_line + 1 if node.respond_to?(:start_line) && node.start_line
-        @end_line = node.end_line + 1 if node.respond_to?(:end_line) && node.end_line
+        @end_line = node.end_line if node.respond_to?(:end_line) && node.end_line
 
         # Handle edge case where end_line might be before start_line
         @end_line = @start_line if @start_line && @end_line && @end_line < @start_line
@@ -157,6 +174,14 @@ module Psych
         (@start_line..@end_line).map { |ln| @lines[ln - 1] }.join
       end
 
+      # String representation of the node value.
+      # For scalars, returns the value.
+      # For other nodes, returns inspect.
+      # @return [String]
+      def to_s
+        value || inspect
+      end
+
       # String representation for debugging
       # @return [String]
       def inspect
@@ -188,8 +213,6 @@ module Psych
           [:document, root_type]
         when ::Psych::Nodes::Stream
           [:stream]
-        else
-          nil
         end
       end
 
@@ -209,7 +232,7 @@ module Psych
       end
 
       def extract_key_name(key_node)
-        return nil unless key_node.is_a?(::Psych::Nodes::Scalar)
+        return unless key_node.is_a?(::Psych::Nodes::Scalar)
 
         key_node.value
       end
@@ -233,7 +256,7 @@ module Psych
           lines: @lines,
           leading_comments: leading,
           inline_comment: inline,
-          key: key
+          key: key,
         )
       end
     end

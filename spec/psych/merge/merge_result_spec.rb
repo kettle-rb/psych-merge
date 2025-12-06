@@ -1,6 +1,14 @@
 # frozen_string_literal: true
 
+require "ast/merge/rspec/shared_examples"
+
 RSpec.describe Psych::Merge::MergeResult do
+  # Use shared examples to validate base MergeResultBase integration
+  it_behaves_like "Ast::Merge::MergeResultBase" do
+    let(:merge_result_class) { described_class }
+    let(:build_merge_result) { -> { described_class.new } }
+  end
+
   describe "#initialize" do
     it "starts with empty lines" do
       result = described_class.new
@@ -73,7 +81,7 @@ RSpec.describe Psych::Merge::MergeResult do
       freeze_node = Psych::Merge::FreezeNode.new(
         start_line: 1,
         end_line: 3,
-        lines: lines
+        lines: lines,
       )
 
       result = described_class.new
@@ -152,7 +160,7 @@ RSpec.describe Psych::Merge::MergeResult do
 
     it "adds lines from mapping entry" do
       result = described_class.new
-      entry = analysis.nodes.first
+      entry = analysis.statements.first
 
       result.add_mapping_entry(entry, decision: :kept_dest, source: :destination)
 
@@ -196,7 +204,7 @@ RSpec.describe Psych::Merge::MergeResult do
       freeze_node = Psych::Merge::FreezeNode.new(
         start_line: 1,
         end_line: 3,
-        lines: lines
+        lines: lines,
       )
 
       result = described_class.new

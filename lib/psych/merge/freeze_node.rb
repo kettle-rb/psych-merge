@@ -6,8 +6,10 @@ module Psych
     # A freeze block is a section marked with freeze/unfreeze comment markers that
     # should be preserved from the destination during merges.
     #
-    # Inherits from Ast::Merge::FreezeNode for shared functionality including
-    # the Location struct and InvalidStructureError.
+    # Inherits from Ast::Merge::FreezeNodeBase for shared functionality including
+    # the Location struct, InvalidStructureError, and configurable marker patterns.
+    #
+    # Uses the `:hash_comment` pattern type by default for YAML files.
     #
     # @example Freeze block in YAML
     #   # psych-merge:freeze
@@ -15,27 +17,31 @@ module Psych
     #     secret_key: "my-secret-value"
     #     api_endpoint: "https://custom.example.com"
     #   # psych-merge:unfreeze
-    class FreezeNode < Ast::Merge::FreezeNode
+    class FreezeNode < Ast::Merge::FreezeNodeBase
       # Inherit InvalidStructureError from base class
-      InvalidStructureError = Ast::Merge::FreezeNode::InvalidStructureError
+      InvalidStructureError = Ast::Merge::FreezeNodeBase::InvalidStructureError
 
       # Inherit Location from base class
-      Location = Ast::Merge::FreezeNode::Location
-
-      # @return [Array<String>] Lines within the freeze block
-      attr_reader :lines
+      Location = Ast::Merge::FreezeNodeBase::Location
 
       # @param start_line [Integer] Line number of freeze marker
       # @param end_line [Integer] Line number of unfreeze marker
       # @param lines [Array<String>] All source lines
       # @param start_marker [String, nil] The freeze start marker text
       # @param end_marker [String, nil] The freeze end marker text
-      def initialize(start_line:, end_line:, lines:, start_marker: nil, end_marker: nil)
-        super(start_line: start_line, end_line: end_line, start_marker: start_marker, end_marker: end_marker)
+      # @param pattern_type [Symbol] Pattern type for marker matching (defaults to :hash_comment)
+      def initialize(start_line:, end_line:, lines:, start_marker: nil, end_marker: nil, pattern_type: Ast::Merge::FreezeNodeBase::DEFAULT_PATTERN)
+        # Extract lines for the entire block (lines param is all source lines)
+        block_lines = (start_line..end_line).map { |ln| lines[ln - 1] }
 
-        # Extract lines for the entire block
-        @lines = (start_line..end_line).map { |ln| lines[ln - 1] }
-        @content = @lines.join
+        super(
+          start_line: start_line,
+          end_line: end_line,
+          lines: block_lines,
+          start_marker: start_marker,
+          end_marker: end_marker,
+          pattern_type: pattern_type
+        )
 
         validate_structure!
       end
@@ -70,7 +76,7 @@ module Psych
       # String representation for debugging
       # @return [String]
       def inspect
-        "#<#{self.class.name} lines=#{start_line}..#{end_line} content_length=#{content&.length || 0}>"
+        "#<#{self.class.name} lines=#{start_line}..#{end_line} content_length=#{slice&.length || 0}>"
       end
 
       private
@@ -82,7 +88,7 @@ module Psych
           raise InvalidStructureError.new(
             "Freeze block is empty",
             start_line: @start_line,
-            end_line: @end_line
+            end_line: @end_line,
           )
         end
       end

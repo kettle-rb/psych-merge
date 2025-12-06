@@ -33,8 +33,8 @@ RSpec.describe Psych::Merge::FileAnalysis do
 
       analysis = described_class.new(yaml)
 
-      expect(analysis.nodes.length).to eq(2)
-      expect(analysis.nodes.first).to be_a(Psych::Merge::MappingEntry)
+      expect(analysis.statements.length).to eq(2)
+      expect(analysis.statements.first).to be_a(Psych::Merge::MappingEntry)
     end
 
     it "handles nested mappings" do
@@ -46,7 +46,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
 
       analysis = described_class.new(yaml)
 
-      expect(analysis.nodes.length).to eq(2)
+      expect(analysis.statements.length).to eq(2)
     end
   end
 
@@ -174,7 +174,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       custom_generator = ->(node) { [:custom, "signature"] }
 
       analysis = described_class.new(yaml, signature_generator: custom_generator)
-      sig = analysis.generate_signature(analysis.nodes.first)
+      sig = analysis.generate_signature(analysis.statements.first)
 
       expect(sig).to eq([:custom, "signature"])
     end
@@ -184,12 +184,12 @@ RSpec.describe Psych::Merge::FileAnalysis do
       custom_generator = ->(node) { node }
 
       analysis = described_class.new(yaml, signature_generator: custom_generator)
-      sig = analysis.generate_signature(analysis.nodes.first)
+      sig = analysis.generate_signature(analysis.statements.first)
 
       expect(sig).to eq([:mapping_entry, "key"])
     end
 
-    it "falls through when generator returns a FreezeNode" do
+    it "falls through when generator returns a FreezeNodeBase" do
       yaml = <<~YAML
         # psych-merge:freeze
         frozen: value
@@ -216,7 +216,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       }
 
       analysis = described_class.new(yaml, signature_generator: custom_generator)
-      sig = analysis.generate_signature(analysis.nodes.first)
+      sig = analysis.generate_signature(analysis.statements.first)
 
       # Should fall through to compute_node_signature for the NodeWrapper
       expect(sig.first).to eq(:scalar)
@@ -269,7 +269,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       expect(analysis.valid?).to be(true)
-      expect(analysis.nodes.length).to eq(2)
+      expect(analysis.statements.length).to eq(2)
     end
   end
 
@@ -390,8 +390,8 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       # Should have 3 items: before node, freeze block, after node
-      expect(analysis.nodes.length).to eq(3)
-      expect(analysis.nodes[1]).to be_a(Psych::Merge::FreezeNode)
+      expect(analysis.statements.length).to eq(3)
+      expect(analysis.statements[1]).to be_a(Psych::Merge::FreezeNode)
     end
 
     it "excludes nodes inside freeze blocks from regular nodes" do
@@ -404,10 +404,9 @@ RSpec.describe Psych::Merge::FileAnalysis do
       YAML
 
       analysis = described_class.new(yaml)
-      node_types = analysis.nodes.map(&:class)
 
       # Should not have MappingEntry for frozen content
-      freeze_nodes = analysis.nodes.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
+      freeze_nodes = analysis.statements.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
       expect(freeze_nodes.length).to eq(1)
     end
   end
@@ -447,7 +446,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
     end
 
     let(:analysis) { described_class.new(yaml) }
-    let(:entry) { analysis.nodes.first }
+    let(:entry) { analysis.statements.first }
 
     it "returns key_name" do
       expect(entry.key_name).to eq("key")
@@ -492,7 +491,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       end
 
       let(:nested_analysis) { described_class.new(nested_yaml) }
-      let(:nested_entry) { nested_analysis.nodes.first }
+      let(:nested_entry) { nested_analysis.statements.first }
 
       it "mapping? delegates to value" do
         expect(nested_entry.mapping?).to be(true)
@@ -527,7 +526,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
           key: mock_key,
           value: mock_value,
           lines: [],
-          comment_tracker: mock_tracker
+          comment_tracker: mock_tracker,
         )
 
         expect(entry.line_range).to be_nil
@@ -544,7 +543,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
           key: mock_key,
           value: mock_value,
           lines: [],
-          comment_tracker: mock_tracker
+          comment_tracker: mock_tracker,
         )
 
         expect(entry.content).to eq("")
@@ -561,7 +560,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
           key: mock_key,
           value: mock_value,
           lines: ["key: value", "more"],
-          comment_tracker: mock_tracker
+          comment_tracker: mock_tracker,
         )
 
         expect(entry.end_line).to eq(2)
@@ -577,7 +576,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       # Empty YAML won't have proper document structure
-      expect(analysis.nodes).to eq([])
+      expect(analysis.statements).to eq([])
     end
 
     it "handles root that is not a mapping (sequence)" do
@@ -589,9 +588,9 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       # Should wrap the sequence as a single node
-      expect(analysis.nodes.length).to eq(1)
-      expect(analysis.nodes.first).to be_a(Psych::Merge::NodeWrapper)
-      expect(analysis.nodes.first.sequence?).to be(true)
+      expect(analysis.statements.length).to eq(1)
+      expect(analysis.statements.first).to be_a(Psych::Merge::NodeWrapper)
+      expect(analysis.statements.first.sequence?).to be(true)
     end
 
     it "handles root scalar" do
@@ -599,9 +598,9 @@ RSpec.describe Psych::Merge::FileAnalysis do
 
       analysis = described_class.new(yaml)
 
-      expect(analysis.nodes.length).to eq(1)
-      expect(analysis.nodes.first).to be_a(Psych::Merge::NodeWrapper)
-      expect(analysis.nodes.first.scalar?).to be(true)
+      expect(analysis.statements.length).to eq(1)
+      expect(analysis.statements.first).to be_a(Psych::Merge::NodeWrapper)
+      expect(analysis.statements.first.scalar?).to be(true)
     end
 
     it "handles freeze block already in all_nodes list" do
@@ -616,7 +615,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       # The freeze block should appear only once
-      freeze_nodes = analysis.nodes.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
+      freeze_nodes = analysis.statements.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
       expect(freeze_nodes.length).to eq(1)
     end
   end
@@ -626,7 +625,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
       yaml = "key: value"
       analysis = described_class.new(yaml)
 
-      # Pass something that isn't FreezeNode, MappingEntry, or NodeWrapper
+      # Pass something that isn't FreezeNodeBase, MappingEntry, or NodeWrapper
       sig = analysis.send(:compute_node_signature, "unknown")
 
       expect(sig).to be_nil
@@ -725,9 +724,9 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       # Freeze block should be added at the end
-      freeze_nodes = analysis.nodes.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
+      freeze_nodes = analysis.statements.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
       expect(freeze_nodes.length).to eq(1)
-      expect(analysis.nodes.last).to be_a(Psych::Merge::FreezeNode)
+      expect(analysis.statements.last).to be_a(Psych::Merge::FreezeNode)
     end
 
     it "handles freeze block at start of file (before all entries)" do
@@ -741,9 +740,9 @@ RSpec.describe Psych::Merge::FileAnalysis do
 
       analysis = described_class.new(yaml)
 
-      freeze_nodes = analysis.nodes.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
+      freeze_nodes = analysis.statements.select { |n| n.is_a?(Psych::Merge::FreezeNode) }
       expect(freeze_nodes.length).to eq(1)
-      expect(analysis.nodes.first).to be_a(Psych::Merge::FreezeNode)
+      expect(analysis.statements.first).to be_a(Psych::Merge::FreezeNode)
     end
 
     it "handles sequence root with freeze blocks" do
@@ -755,8 +754,8 @@ RSpec.describe Psych::Merge::FileAnalysis do
       analysis = described_class.new(yaml)
 
       # Sequence root should be wrapped as single NodeWrapper
-      expect(analysis.nodes.length).to eq(1)
-      expect(analysis.nodes.first.sequence?).to be(true)
+      expect(analysis.statements.length).to eq(1)
+      expect(analysis.statements.first.sequence?).to be(true)
     end
 
     it "handles scalar root" do
@@ -764,8 +763,8 @@ RSpec.describe Psych::Merge::FileAnalysis do
 
       analysis = described_class.new(yaml)
 
-      expect(analysis.nodes.length).to eq(1)
-      expect(analysis.nodes.first.scalar?).to be(true)
+      expect(analysis.statements.length).to eq(1)
+      expect(analysis.statements.first.scalar?).to be(true)
     end
   end
 end

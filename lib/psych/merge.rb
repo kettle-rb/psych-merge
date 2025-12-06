@@ -36,23 +36,25 @@ module Psych
   # @see ConflictResolver Resolves content conflicts
   module Merge
     # Base error class for Psych::Merge
-    class Error < StandardError; end
+    # Inherits from Ast::Merge::Error for consistency across merge gems.
+    class Error < Ast::Merge::Error; end
 
-    # Raised when a YAML file has parsing errors
-    class ParseError < Error
-      # @return [String] The content that failed to parse
-      attr_reader :content
-
-      # @return [Array] The parse errors
-      attr_reader :errors
-
-      # @param message [String] Error message
-      # @param content [String] The YAML source that failed to parse
+    # Raised when a YAML file has parsing errors.
+    # Inherits from Ast::Merge::ParseError for consistency across merge gems.
+    #
+    # @example Handling parse errors
+    #   begin
+    #     analysis = FileAnalysis.new(yaml_content)
+    #   rescue ParseError => e
+    #     puts "YAML syntax error: #{e.message}"
+    #     e.errors.each { |error| puts "  #{error}" }
+    #   end
+    class ParseError < Ast::Merge::ParseError
+      # @param message [String, nil] Error message (auto-generated if nil)
+      # @param content [String, nil] The YAML source that failed to parse
       # @param errors [Array] Parse errors from Psych
-      def initialize(message, content:, errors:)
-        super(message)
-        @content = content
-        @errors = errors
+      def initialize(message = nil, content: nil, errors: [])
+        super(message, errors: errors, content: content)
       end
     end
 
@@ -94,6 +96,7 @@ module Psych
     autoload :NodeWrapper, "psych/merge/node_wrapper"
     autoload :ConflictResolver, "psych/merge/conflict_resolver"
     autoload :SmartMerger, "psych/merge/smart_merger"
+    autoload :MappingMatchRefiner, "psych/merge/mapping_match_refiner"
   end
 end
 

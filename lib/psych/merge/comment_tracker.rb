@@ -105,7 +105,7 @@ module Psych
       # @param line_num [Integer] 1-based line number
       # @return [String, nil]
       def line_at(line_num)
-        return nil if line_num < 1 || line_num > @lines.length
+        return if line_num < 1 || line_num > @lines.length
 
         @lines[line_num - 1]
       end

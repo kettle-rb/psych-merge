@@ -1,6 +1,40 @@
 # frozen_string_literal: true
 
+require "ast/merge/rspec/shared_examples"
+
 RSpec.describe Psych::Merge::FreezeNode do
+  # Use shared examples to validate base FreezeNodeBase integration
+  it_behaves_like "Ast::Merge::FreezeNodeBase" do
+    let(:freeze_node_class) { described_class }
+    let(:default_pattern_type) { :hash_comment }
+    let(:build_freeze_node) do
+      ->(start_line:, end_line:, **opts) {
+        # Build enough lines to cover the requested range
+        lines = opts.delete(:lines) || begin
+          result = []
+          (1..end_line).each do |i|
+            result << if i == start_line
+              "# psych-merge:freeze"
+            elsif i == end_line
+              "# psych-merge:unfreeze"
+            else
+              "key_#{i}: value_#{i}"
+            end
+          end
+          result
+        end
+        freeze_node_class.new(
+          start_line: start_line,
+          end_line: end_line,
+          lines: lines,
+          pattern_type: opts[:pattern_type] || :hash_comment,
+          **opts.except(:pattern_type),
+        )
+      }
+    end
+  end
+
+  # Psych-specific tests
   let(:lines) do
     [
       "# psych-merge:freeze",
@@ -15,7 +49,7 @@ RSpec.describe Psych::Merge::FreezeNode do
       node = described_class.new(
         start_line: 1,
         end_line: 4,
-        lines: lines
+        lines: lines,
       )
 
       expect(node.start_line).to eq(1)
@@ -27,7 +61,7 @@ RSpec.describe Psych::Merge::FreezeNode do
       node = described_class.new(
         start_line: 1,
         end_line: 4,
-        lines: lines
+        lines: lines,
       )
 
       expect(node.content).to include("frozen_key: frozen_value")
@@ -57,30 +91,6 @@ RSpec.describe Psych::Merge::FreezeNode do
       expect(node.location.cover?(2)).to be(true)
       expect(node.location.cover?(4)).to be(true)
       expect(node.location.cover?(5)).to be(false)
-    end
-  end
-
-  describe "#signature" do
-    it "returns a signature array" do
-      node = described_class.new(start_line: 1, end_line: 4, lines: lines)
-      sig = node.signature
-
-      expect(sig).to be_an(Array)
-      expect(sig.first).to eq(:FreezeNode)
-    end
-
-    it "signature includes normalized content" do
-      node = described_class.new(start_line: 1, end_line: 4, lines: lines)
-      sig = node.signature
-
-      expect(sig.last).to include("frozen_key")
-    end
-  end
-
-  describe "#freeze_node?" do
-    it "returns true" do
-      node = described_class.new(start_line: 1, end_line: 4, lines: lines)
-      expect(node.freeze_node?).to be(true)
     end
   end
 
@@ -133,7 +143,7 @@ RSpec.describe Psych::Merge::FreezeNode do
         start_line: 1,
         end_line: 4,
         lines: lines,
-        start_marker: "# psych-merge:freeze"
+        start_marker: "# psych-merge:freeze",
       )
 
       expect(node.start_marker).to eq("# psych-merge:freeze")
@@ -144,7 +154,7 @@ RSpec.describe Psych::Merge::FreezeNode do
         start_line: 1,
         end_line: 4,
         lines: lines,
-        end_marker: "# psych-merge:unfreeze"
+        end_marker: "# psych-merge:unfreeze",
       )
 
       expect(node.end_marker).to eq("# psych-merge:unfreeze")
@@ -153,12 +163,10 @@ RSpec.describe Psych::Merge::FreezeNode do
 
   describe "InvalidStructureError" do
     it "has start_line accessor" do
-      begin
-        described_class.new(start_line: 4, end_line: 1, lines: lines)
-      rescue Psych::Merge::FreezeNode::InvalidStructureError => e
-        expect(e.start_line).to eq(4)
-        expect(e.end_line).to eq(1)
-      end
+      described_class.new(start_line: 4, end_line: 1, lines: lines)
+    rescue Psych::Merge::FreezeNode::InvalidStructureError => e
+      expect(e.start_line).to eq(4)
+      expect(e.end_line).to eq(1)
     end
 
     it "raises error when end_line is before start_line" do

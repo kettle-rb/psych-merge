@@ -2,29 +2,19 @@
 
 module Psych
   module Merge
-    # Analyzes YAML file structure, extracting nodes, comments, and freeze blocks.
+    # Analyzes YAML file structure, extracting statements, comments, and freeze blocks.
     # This is the main analysis class that prepares YAML content for merging.
     #
     # @example Basic usage
     #   analysis = FileAnalysis.new(yaml_source)
     #   analysis.valid? # => true
-    #   analysis.nodes # => [NodeWrapper, FreezeNode, ...]
-    #   analysis.freeze_blocks # => [FreezeNode, ...]
+    #   analysis.statements # => [NodeWrapper, FreezeNodeBase, ...]
+    #   analysis.freeze_blocks # => [FreezeNodeBase, ...]
     class FileAnalysis
+      include Ast::Merge::FileAnalyzable
+
       # Default freeze token for identifying freeze blocks
       DEFAULT_FREEZE_TOKEN = "psych-merge"
-
-      # @return [String] Source YAML content
-      attr_reader :source
-
-      # @return [Array<String>] Lines of source
-      attr_reader :lines
-
-      # @return [String] Token used to mark freeze blocks
-      attr_reader :freeze_token
-
-      # @return [Proc, nil] Custom signature generator
-      attr_reader :signature_generator
 
       # @return [CommentTracker] Comment tracker for this file
       attr_reader :comment_tracker
@@ -55,11 +45,11 @@ module Psych
 
         # Extract freeze blocks and integrate with nodes
         @freeze_blocks = extract_freeze_blocks
-        @nodes = integrate_nodes_and_freeze_blocks
+        @statements = integrate_nodes_and_freeze_blocks
 
         DebugLogger.debug("FileAnalysis initialized", {
           signature_generator: signature_generator ? "custom" : "default",
-          nodes_count: @nodes.size,
+          statements_count: @statements.size,
           freeze_blocks: @freeze_blocks.size,
           valid: valid?,
         })
@@ -71,14 +61,6 @@ module Psych
         @errors.empty? && !@ast.nil?
       end
 
-      # Get all top-level nodes (wrapped Psych nodes and FreezeNodes)
-      # @return [Array<NodeWrapper, FreezeNode>]
-      attr_reader :nodes
-
-      # Get all freeze blocks
-      # @return [Array<FreezeNode>]
-      attr_reader :freeze_blocks
-
       # Check if a line is within a freeze block
       # @param line_num [Integer] 1-based line number
       # @return [Boolean]
@@ -88,27 +70,18 @@ module Psych
 
       # Get the freeze block containing the given line
       # @param line_num [Integer] 1-based line number
-      # @return [FreezeNode, nil]
+      # @return [FreezeNodeBase, nil]
       def freeze_block_at(line_num)
         @freeze_blocks.find { |fb| fb.location.cover?(line_num) }
       end
 
-      # Get signature for a node at given index
-      # @param index [Integer] Node index
-      # @return [Array, nil]
-      def signature_at(index)
-        return nil if index < 0 || index >= @nodes.length
-
-        generate_signature(@nodes[index])
-      end
-
       # Generate signature for a node
-      # @param node [NodeWrapper, FreezeNode] Node to generate signature for
+      # @param node [NodeWrapper, FreezeNodeBase] Node to generate signature for
       # @return [Array, nil]
       def generate_signature(node)
         result = if @signature_generator
           custom_result = @signature_generator.call(node)
-          if custom_result.is_a?(NodeWrapper) || custom_result.is_a?(FreezeNode) || custom_result.is_a?(MappingEntry)
+          if custom_result.is_a?(NodeWrapper) || custom_result.is_a?(Ast::Merge::FreezeNodeBase) || custom_result.is_a?(MappingEntry)
             # Fall through to default computation
             compute_node_signature(custom_result)
           else
@@ -127,23 +100,24 @@ module Psych
         result
       end
 
+      # Override to detect Psych nodes for signature generator fallthrough
+      # @param value [Object] The value to check
+      # @return [Boolean] true if this is a fallthrough node
+      def fallthrough_node?(value)
+        value.is_a?(NodeWrapper) || value.is_a?(Ast::Merge::FreezeNodeBase) || value.is_a?(MappingEntry)
+      end
+
       # Get normalized line content (stripped)
       # @param line_num [Integer] 1-based line number
       # @return [String, nil]
       def normalized_line(line_num)
-        return nil if line_num < 1 || line_num > @lines.length
+        return if line_num < 1 || line_num > @lines.length
 
         @lines[line_num - 1].strip
       end
 
       # Get raw line content
       # @param line_num [Integer] 1-based line number
-      # @return [String, nil]
-      def line_at(line_num)
-        return nil if line_num < 1 || line_num > @lines.length
-
-        @lines[line_num - 1]
-      end
 
       # Get mapping entries from the root document
       # @return [Array<Array(NodeWrapper, NodeWrapper)>]
@@ -163,13 +137,13 @@ module Psych
       # Get the root node of the first document
       # @return [NodeWrapper, nil]
       def root_node
-        return nil unless valid? && @ast.children&.any?
+        return unless valid? && @ast.children&.any?
 
         doc = @ast.children.first
-        return nil unless doc.is_a?(::Psych::Nodes::Document)
+        return unless doc.is_a?(::Psych::Nodes::Document)
 
         root = doc.children&.first
-        return nil unless root
+        return unless root
 
         NodeWrapper.new(root, lines: @lines)
       end
@@ -184,17 +158,20 @@ module Psych
       end
 
       def extract_freeze_blocks
-        freeze_regex = /^\s*#\s*#{Regexp.escape(@freeze_token)}:freeze\s*$/
-        unfreeze_regex = /^\s*#\s*#{Regexp.escape(@freeze_token)}:unfreeze\s*$/
+        # Use shared pattern from Ast::Merge::FreezeNodeBase with our specific token
+        freeze_pattern = Ast::Merge::FreezeNodeBase.pattern_for(:hash_comment, @freeze_token)
 
         freeze_starts = []
         freeze_ends = []
 
         @lines.each_with_index do |line, idx|
           line_num = idx + 1
-          if line =~ freeze_regex
+          next unless (match = line.match(freeze_pattern))
+
+          marker_type = match[1]&.downcase # 'freeze' or 'unfreeze'
+          if marker_type == "freeze"
             freeze_starts << {line: line_num, marker: line}
-          elsif line =~ unfreeze_regex
+          elsif marker_type == "unfreeze"
             freeze_ends << {line: line_num, marker: line}
           end
         end
@@ -214,7 +191,7 @@ module Psych
             end_line: matching_end[:line],
             lines: @lines,
             start_marker: start_info[:marker],
-            end_marker: matching_end[:marker]
+            end_marker: matching_end[:marker],
           )
         end
 
@@ -257,7 +234,7 @@ module Psych
               key: key_wrapper,
               value: value_wrapper,
               lines: @lines,
-              comment_tracker: @comment_tracker
+              comment_tracker: @comment_tracker,
             )
           end
 
@@ -286,8 +263,6 @@ module Psych
           [:mapping_entry, node.key_name]
         when NodeWrapper
           node.signature
-        else
-          nil
         end
       end
     end
@@ -344,7 +319,7 @@ module Psych
       # Get the line range
       # @return [Range, nil]
       def line_range
-        return nil unless start_line && end_line
+        return unless start_line && end_line
 
         start_line..end_line
       end

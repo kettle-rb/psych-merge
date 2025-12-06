@@ -40,7 +40,7 @@ RSpec.describe Psych::Merge::SmartMerger do
         dest,
         signature_match_preference: :template,
         add_template_only_nodes: true,
-        freeze_token: "custom-token"
+        freeze_token: "custom-token",
       )
 
       expect(merger.signature_match_preference).to eq(:template)
@@ -98,7 +98,7 @@ RSpec.describe Psych::Merge::SmartMerger do
         merger = described_class.new(
           template,
           dest,
-          signature_match_preference: :template
+          signature_match_preference: :template,
         )
         result = merger.merge
 
@@ -118,7 +118,7 @@ RSpec.describe Psych::Merge::SmartMerger do
         merger = described_class.new(
           template,
           dest,
-          add_template_only_nodes: true
+          add_template_only_nodes: true,
         )
         result = merger.merge
 
@@ -445,11 +445,76 @@ RSpec.describe Psych::Merge::SmartMerger do
       merger = described_class.new(
         template,
         dest,
-        signature_generator: custom_generator
+        signature_generator: custom_generator,
       )
       result = merger.merge
 
       expect(result).to include("dest_value")
+    end
+  end
+
+  describe "regression tests" do
+    # Regression test for bug where destination-only keys with nested mappings
+    # would cause the key to be emitted twice due to overlapping line ranges.
+    # The bug was in NodeWrapper where end_line was calculated as node.end_line + 1,
+    # but Psych's end_line is already exclusive, so this caused off-by-one errors.
+    it "does not duplicate keys when destination adds a new nested mapping" do
+      template = <<~YAML
+        name: my-project
+        version: 1.0.0
+        database:
+          host: localhost
+          port: 5432
+      YAML
+
+      dest = <<~YAML
+        name: my-project
+        version: 1.0.0
+        database:
+          host: localhost
+          port: 5432
+        cache:
+          enabled: true
+          ttl: 3600
+      YAML
+
+      merger = described_class.new(template, dest)
+      result = merger.merge
+
+      # The key "cache" should appear exactly once
+      expect(result.scan(/^cache:/).length).to eq(1), 
+        "Expected 'cache:' to appear once but got: #{result.inspect}"
+      
+      # Verify the full structure is correct
+      expect(result).to include("cache:")
+      expect(result).to include("enabled: true")
+      expect(result).to include("ttl: 3600")
+    end
+
+    it "merge is idempotent when destination adds nested mappings" do
+      template = <<~YAML
+        name: my-project
+        database:
+          host: localhost
+      YAML
+
+      dest = <<~YAML
+        name: my-project
+        database:
+          host: localhost
+        cache:
+          enabled: true
+      YAML
+
+      merger1 = described_class.new(template, dest)
+      result1 = merger1.merge
+
+      # Merge again using the result as both template and destination
+      merger2 = described_class.new(result1, result1)
+      result2 = merger2.merge
+
+      expect(result2).to eq(result1), 
+        "Merge should be idempotent.\nFirst: #{result1.inspect}\nSecond: #{result2.inspect}"
     end
   end
 end

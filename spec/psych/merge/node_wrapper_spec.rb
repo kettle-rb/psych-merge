@@ -307,13 +307,13 @@ RSpec.describe Psych::Merge::NodeWrapper do
 
     it "returns empty string when no line info" do
       ast = Psych.parse_stream(simple_yaml)
-      doc = ast.children.first
-      root = doc.children.first
+      _doc = ast.children.first
 
       # Create wrapper with node that doesn't have line info
       class FakeNode
-        def start_line; nil; end
-        def end_line; nil; end
+        def start_line = nil
+        def end_line = nil
+
         def respond_to?(method, include_all = false)
           [:start_line, :end_line].include?(method) || super
         end

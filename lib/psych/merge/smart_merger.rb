@@ -29,28 +29,11 @@ module Psych
     #     end
     #   }
     #   merger = SmartMerger.new(template, dest, signature_generator: sig_gen)
-    class SmartMerger
-      # @return [FileAnalysis] Analysis of the template file
-      attr_reader :template_analysis
-
-      # @return [FileAnalysis] Analysis of the destination file
-      attr_reader :dest_analysis
-
-      # @return [ConflictResolver] Resolver for handling conflicts
-      attr_reader :resolver
-
-      # @return [MergeResult] Result of the merge operation
-      attr_reader :result
-
-      # @return [Symbol] Preference for signature matches
-      attr_reader :signature_match_preference
-
-      # @return [Boolean] Whether to add template-only nodes
-      attr_reader :add_template_only_nodes
-
-      # @return [String] Token used for freeze blocks
-      attr_reader :freeze_token
-
+    #
+    # @example With regions (embedded content)
+    #   merger = SmartMerger.new(template, dest,
+    #     regions: [{ detector: SomeDetector.new, merger_class: SomeMerger }])
+    class SmartMerger < ::Ast::Merge::SmartMergerBase
       # Creates a new SmartMerger for intelligent YAML file merging.
       #
       # @param template_content [String] Template YAML source code
@@ -62,6 +45,11 @@ module Psych
       #   - :template - Use template version (updates)
       # @param add_template_only_nodes [Boolean] Whether to add nodes only in template
       # @param freeze_token [String] Token for freeze block markers
+      # @param match_refiner [#call, nil] Optional match refiner for fuzzy matching of
+      #   unmatched nodes. Default: nil (fuzzy matching disabled).
+      #   Set to MappingMatchRefiner.new to enable fuzzy key matching.
+      # @param regions [Array<Hash>, nil] Region configurations for nested merging
+      # @param region_placeholder [String, nil] Custom placeholder for regions
       #
       # @raise [TemplateParseError] If template has syntax errors
       # @raise [DestinationParseError] If destination has syntax errors
@@ -71,55 +59,29 @@ module Psych
         signature_generator: nil,
         signature_match_preference: :destination,
         add_template_only_nodes: false,
-        freeze_token: FileAnalysis::DEFAULT_FREEZE_TOKEN
+        freeze_token: FileAnalysis::DEFAULT_FREEZE_TOKEN,
+        match_refiner: nil,
+        regions: nil,
+        region_placeholder: nil
       )
-        @signature_match_preference = signature_match_preference
-        @add_template_only_nodes = add_template_only_nodes
-        @freeze_token = freeze_token
-
-        # Analyze both files
-        @template_analysis = FileAnalysis.new(
+        super(
           template_content,
-          freeze_token: freeze_token,
-          signature_generator: signature_generator
-        )
-
-        @dest_analysis = FileAnalysis.new(
           dest_content,
-          freeze_token: freeze_token,
-          signature_generator: signature_generator
-        )
-
-        # Validate parsing
-        validate_parsing!
-
-        # Create resolver
-        @resolver = ConflictResolver.new(
-          @template_analysis,
-          @dest_analysis,
+          signature_generator: signature_generator,
           signature_match_preference: signature_match_preference,
-          add_template_only_nodes: add_template_only_nodes
+          add_template_only_nodes: add_template_only_nodes,
+          freeze_token: freeze_token,
+          match_refiner: match_refiner,
+          regions: regions,
+          region_placeholder: region_placeholder,
         )
-
-        # Initialize result
-        @result = MergeResult.new
-
-        DebugLogger.debug("SmartMerger initialized", {
-          template_valid: @template_analysis.valid?,
-          dest_valid: @dest_analysis.valid?,
-          preference: signature_match_preference,
-          add_template_only: add_template_only_nodes,
-        })
       end
 
       # Perform the merge and return the result as a YAML string.
       #
       # @return [String] Merged YAML content
       def merge
-        DebugLogger.time("SmartMerger#merge") do
-          @resolver.resolve(@result)
-          @result.to_yaml
-        end
+        merge_result.to_yaml
       end
 
       # Perform the merge and return detailed results including debug info.
@@ -134,12 +96,12 @@ module Psych
           decisions: @result.decision_summary,
           template_analysis: {
             valid: @template_analysis.valid?,
-            nodes: @template_analysis.nodes.size,
+            statements: @template_analysis.statements.size,
             freeze_blocks: @template_analysis.freeze_blocks.size,
           },
           dest_analysis: {
             valid: @dest_analysis.valid?,
-            nodes: @dest_analysis.nodes.size,
+            statements: @dest_analysis.statements.size,
             freeze_blocks: @dest_analysis.freeze_blocks.size,
           },
         }
@@ -162,24 +124,66 @@ module Psych
         errors
       end
 
-      private
+      protected
 
-      def validate_parsing!
-        unless @template_analysis.valid?
-          raise TemplateParseError.new(
-            "Template YAML has syntax errors",
-            content: @template_analysis.source,
-            errors: @template_analysis.errors
-          )
-        end
+      # @return [Class] The analysis class for YAML files
+      def analysis_class
+        FileAnalysis
+      end
 
-        unless @dest_analysis.valid?
-          raise DestinationParseError.new(
-            "Destination YAML has syntax errors",
-            content: @dest_analysis.source,
-            errors: @dest_analysis.errors
-          )
-        end
+      # @return [String] The default freeze token for YAML
+      def default_freeze_token
+        FileAnalysis::DEFAULT_FREEZE_TOKEN
+      end
+
+      # @return [Class] The resolver class for YAML files
+      def resolver_class
+        ConflictResolver
+      end
+
+      # @return [Class] The result class for YAML files
+      def result_class
+        MergeResult
+      end
+
+      # Perform the YAML-specific merge
+      #
+      # @return [MergeResult] The merge result
+      def perform_merge
+        @resolver.resolve(@result)
+
+        DebugLogger.debug("Merge complete", {
+          lines: @result.line_count,
+          decisions: @result.statistics,
+        })
+
+        @result
+      end
+
+      # Build the resolver with YAML-specific signature
+      def build_resolver
+        ConflictResolver.new(
+          @template_analysis,
+          @dest_analysis,
+          signature_match_preference: @signature_match_preference,
+          add_template_only_nodes: @add_template_only_nodes,
+          match_refiner: @match_refiner,
+        )
+      end
+
+      # Build the result (no-arg constructor for YAML)
+      def build_result
+        MergeResult.new
+      end
+
+      # @return [Class] The template parse error class for YAML
+      def template_parse_error_class
+        TemplateParseError
+      end
+
+      # @return [Class] The destination parse error class for YAML
+      def destination_parse_error_class
+        DestinationParseError
       end
     end
   end

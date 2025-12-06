@@ -1,6 +1,51 @@
 # frozen_string_literal: true
 
+require "ast/merge/rspec/shared_examples"
+
 RSpec.describe Psych::Merge::ConflictResolver do
+  # Use shared examples to validate base ConflictResolverBase integration
+  # Note: psych-merge uses the :batch strategy
+  it_behaves_like "Ast::Merge::ConflictResolverBase" do
+    let(:conflict_resolver_class) { described_class }
+    let(:strategy) { :batch }
+    let(:build_conflict_resolver) do
+      ->(preference:, template_analysis:, dest_analysis:, **opts) {
+        described_class.new(
+          template_analysis,
+          dest_analysis,
+          signature_match_preference: preference,
+          add_template_only_nodes: opts.fetch(:add_template_only_nodes, false),
+        )
+      }
+    end
+    let(:build_mock_analysis) do
+      -> {
+        source = "key: value\n"
+        Psych::Merge::FileAnalysis.new(source)
+      }
+    end
+  end
+
+  it_behaves_like "Ast::Merge::ConflictResolverBase batch strategy" do
+    let(:conflict_resolver_class) { described_class }
+    let(:build_conflict_resolver) do
+      ->(preference:, template_analysis:, dest_analysis:, **opts) {
+        described_class.new(
+          template_analysis,
+          dest_analysis,
+          signature_match_preference: preference,
+          add_template_only_nodes: opts.fetch(:add_template_only_nodes, false),
+        )
+      }
+    end
+    let(:build_mock_analysis) do
+      -> {
+        source = "key: value\n"
+        Psych::Merge::FileAnalysis.new(source)
+      }
+    end
+  end
+
   let(:template_yaml) do
     <<~YAML
       key1: template_value1
@@ -26,7 +71,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         template_analysis,
         dest_analysis,
         signature_match_preference: :template,
-        add_template_only_nodes: true
+        add_template_only_nodes: true,
       )
 
       expect(resolver.template_analysis).to eq(template_analysis)
@@ -84,7 +129,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          signature_match_preference: :template
+          signature_match_preference: :template,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -101,7 +146,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          add_template_only_nodes: true
+          add_template_only_nodes: true,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -149,7 +194,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
           template_analysis,
           dest_analysis,
           signature_match_preference: :template,
-          add_template_only_nodes: true
+          add_template_only_nodes: true,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -279,7 +324,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          add_template_only_nodes: true
+          add_template_only_nodes: true,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -310,7 +355,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          signature_match_preference: :template
+          signature_match_preference: :template,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -341,7 +386,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          signature_match_preference: :template
+          signature_match_preference: :template,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -437,7 +482,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          signature_match_preference: :template
+          signature_match_preference: :template,
         )
         result = Psych::Merge::MergeResult.new
 
@@ -473,7 +518,7 @@ RSpec.describe Psych::Merge::ConflictResolver do
         resolver = described_class.new(
           template_analysis,
           dest_analysis,
-          add_template_only_nodes: true
+          add_template_only_nodes: true,
         )
         result = Psych::Merge::MergeResult.new
 

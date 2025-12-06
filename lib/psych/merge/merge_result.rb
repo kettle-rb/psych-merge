@@ -5,19 +5,19 @@ module Psych
     # Tracks the result of a merge operation, including the merged content,
     # decisions made, and statistics.
     #
-    # Inherits decision constants and base functionality from Ast::Merge::MergeResult.
+    # Inherits decision constants and base functionality from Ast::Merge::MergeResultBase.
     #
     # @example Basic usage
     #   result = MergeResult.new
     #   result.add_line("key: value", decision: :kept_template, source: :template)
     #   result.to_yaml # => "key: value\n"
-    class MergeResult < Ast::Merge::MergeResult
+    class MergeResult < Ast::Merge::MergeResultBase
       # Inherit decision constants from base class
-      DECISION_KEPT_TEMPLATE = Ast::Merge::MergeResult::DECISION_KEPT_TEMPLATE
-      DECISION_KEPT_DEST = Ast::Merge::MergeResult::DECISION_KEPT_DEST
-      DECISION_MERGED = Ast::Merge::MergeResult::DECISION_MERGED
-      DECISION_ADDED = Ast::Merge::MergeResult::DECISION_ADDED
-      DECISION_FREEZE_BLOCK = Ast::Merge::MergeResult::DECISION_FREEZE_BLOCK
+      DECISION_KEPT_TEMPLATE = Ast::Merge::MergeResultBase::DECISION_KEPT_TEMPLATE
+      DECISION_KEPT_DEST = Ast::Merge::MergeResultBase::DECISION_KEPT_DEST
+      DECISION_MERGED = Ast::Merge::MergeResultBase::DECISION_MERGED
+      DECISION_ADDED = Ast::Merge::MergeResultBase::DECISION_ADDED
+      DECISION_FREEZE_BLOCK = Ast::Merge::MergeResultBase::DECISION_FREEZE_BLOCK
 
       # @return [Hash] Statistics about the merge
       attr_reader :statistics
@@ -95,7 +95,7 @@ module Psych
             line.chomp,
             decision: DECISION_FREEZE_BLOCK,
             source: :destination,
-            original_line: freeze_node.start_line + idx
+            original_line: freeze_node.start_line + idx,
           )
         end
       end

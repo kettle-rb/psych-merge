@@ -10,12 +10,12 @@ RSpec.describe Psych::Merge do
   end
 
   describe "module structure" do
-    it "defines Error class" do
-      expect(Psych::Merge::Error).to be < StandardError
+    it "defines Error class inheriting from Ast::Merge::Error" do
+      expect(Psych::Merge::Error).to be < Ast::Merge::Error
     end
 
-    it "defines ParseError class" do
-      expect(Psych::Merge::ParseError).to be < Psych::Merge::Error
+    it "defines ParseError class inheriting from Ast::Merge::ParseError" do
+      expect(Psych::Merge::ParseError).to be < Ast::Merge::ParseError
     end
 
     it "defines TemplateParseError class" do
