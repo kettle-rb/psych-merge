@@ -38,12 +38,12 @@ RSpec.describe Psych::Merge::SmartMerger do
       merger = described_class.new(
         template,
         dest,
-        signature_match_preference: :template,
+        preference: :template,
         add_template_only_nodes: true,
         freeze_token: "custom-token",
       )
 
-      expect(merger.signature_match_preference).to eq(:template)
+      expect(merger.preference).to eq(:template)
       expect(merger.add_template_only_nodes).to be(true)
       expect(merger.freeze_token).to eq("custom-token")
     end
@@ -98,7 +98,7 @@ RSpec.describe Psych::Merge::SmartMerger do
         merger = described_class.new(
           template,
           dest,
-          signature_match_preference: :template,
+          preference: :template,
         )
         result = merger.merge
 

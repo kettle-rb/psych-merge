@@ -69,7 +69,7 @@ Psych::Merge is a standalone Ruby module that intelligently merges two versions 
 - **Standalone**: Minimal dependencies - just `ast-merge` and Ruby's built-in `psych`
 - **Customizable**:
   - `signature_generator` - callable custom signature generators
-  - `signature_match_preference` - setting of `:template`, `:destination`, or a Hash for per-node-type preferences
+  - `preference` - setting of `:template`, `:destination`, or a Hash for per-node-type preferences
   - `node_splitter` - Hash mapping node types to callables for per-node-type merge customization (see [ast-merge](https://github.com/kettle-rb/ast-merge) docs)
   - `add_template_only_nodes` - setting to retain nodes that do not exist in destination
   - `freeze_token` - customize freeze block markers (default: `"psych-merge"`)
@@ -260,14 +260,14 @@ Control which version to use when nodes have matching signatures but different c
 merger = Psych::Merge::SmartMerger.new(
   template,
   destination,
-  signature_match_preference: :template,
+  preference: :template,
 )
 
 # Use destination version (default - preserve customizations)
 merger = Psych::Merge::SmartMerger.new(
   template,
   destination,
-  signature_match_preference: :destination,
+  preference: :destination,
 )
 ```
 

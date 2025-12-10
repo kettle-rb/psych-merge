@@ -14,13 +14,12 @@ RSpec.describe Psych::Merge::FileAnalysis do
       expect(analysis.errors).to be_empty
     end
 
-    it "handles invalid YAML" do
+    it "raises Psych::SyntaxError for invalid YAML" do
       yaml = "key: value\n  invalid: indentation"
 
-      analysis = described_class.new(yaml)
-
-      expect(analysis.valid?).to be(false)
-      expect(analysis.errors).not_to be_empty
+      expect {
+        described_class.new(yaml)
+      }.to raise_error(Psych::SyntaxError)
     end
   end
 
@@ -310,11 +309,12 @@ RSpec.describe Psych::Merge::FileAnalysis do
   end
 
   describe "#root_node" do
-    it "returns nil for invalid YAML" do
+    it "raises Psych::SyntaxError for invalid YAML" do
       yaml = "key: value\n  bad: indent"
-      analysis = described_class.new(yaml)
 
-      expect(analysis.root_node).to be_nil
+      expect {
+        described_class.new(yaml)
+      }.to raise_error(Psych::SyntaxError)
     end
 
     it "returns the root node for valid YAML" do

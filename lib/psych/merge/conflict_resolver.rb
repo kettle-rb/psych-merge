@@ -18,27 +18,21 @@ module Psych
       #
       # @param template_analysis [FileAnalysis] Analyzed template file
       # @param dest_analysis [FileAnalysis] Analyzed destination file
-      # @param signature_match_preference [Symbol] Which version to prefer when
+      # @param preference [Symbol] Which version to prefer when
       #   nodes have matching signatures:
       #   - :destination (default) - Keep destination version (customizations)
       #   - :template - Use template version (updates)
       # @param add_template_only_nodes [Boolean] Whether to add nodes only in template
       # @param match_refiner [#call, nil] Optional match refiner for fuzzy matching
-      def initialize(template_analysis, dest_analysis, signature_match_preference: :destination, add_template_only_nodes: false, match_refiner: nil)
+      def initialize(template_analysis, dest_analysis, preference: :destination, add_template_only_nodes: false, match_refiner: nil)
         super(
           strategy: :batch,
-          preference: signature_match_preference,
+          preference: preference,
           template_analysis: template_analysis,
           dest_analysis: dest_analysis,
           add_template_only_nodes: add_template_only_nodes
         )
         @match_refiner = match_refiner
-      end
-
-      # Alias for compatibility with existing code
-      # @return [Symbol]
-      def signature_match_preference
-        preference
       end
 
       protected

@@ -15,7 +15,7 @@ module Psych
     #   merger = SmartMerger.new(
     #     template_yaml,
     #     dest_yaml,
-    #     signature_match_preference: :template,
+    #     preference: :template,
     #     add_template_only_nodes: true
     #   )
     #   result = merger.merge
@@ -39,7 +39,7 @@ module Psych
       # @param template_content [String] Template YAML source code
       # @param dest_content [String] Destination YAML source code
       # @param signature_generator [Proc, nil] Custom signature generator
-      # @param signature_match_preference [Symbol] Which version to prefer when
+      # @param preference [Symbol] Which version to prefer when
       #   nodes have matching signatures:
       #   - :destination (default) - Keep destination version (customizations)
       #   - :template - Use template version (updates)
@@ -57,7 +57,7 @@ module Psych
         template_content,
         dest_content,
         signature_generator: nil,
-        signature_match_preference: :destination,
+        preference: :destination,
         add_template_only_nodes: false,
         freeze_token: FileAnalysis::DEFAULT_FREEZE_TOKEN,
         match_refiner: nil,
@@ -68,7 +68,7 @@ module Psych
           template_content,
           dest_content,
           signature_generator: signature_generator,
-          signature_match_preference: signature_match_preference,
+          preference: preference,
           add_template_only_nodes: add_template_only_nodes,
           freeze_token: freeze_token,
           match_refiner: match_refiner,
@@ -165,7 +165,7 @@ module Psych
         ConflictResolver.new(
           @template_analysis,
           @dest_analysis,
-          signature_match_preference: @signature_match_preference,
+          preference: @preference,
           add_template_only_nodes: @add_template_only_nodes,
           match_refiner: @match_refiner,
         )

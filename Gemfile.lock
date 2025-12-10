@@ -11,7 +11,7 @@ GIT
       yard
 
 PATH
-  remote: ../ast-merge
+  remote: ../..
   specs:
     ast-merge (1.0.0)
       version_gem (~> 1.1, >= 1.1.9)
