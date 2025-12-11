@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   spec.name = "psych-merge"
   spec.version = gem_version
   spec.authors = ["Peter H. Boling"]
-  spec.email = ["peter.boling@gmail.com"]
+  spec.email = ["floss@galtzo.com"]
 
   spec.summary = "☯️ Intelligent YAML file merging using Psych AST analysis"
   spec.description = "☯️ Psych::Merge provides smart YAML file merging that preserves comments, anchors/aliases, and supports freeze blocks for protecting destination content. Perfect for merging configuration templates with customized destination files."
