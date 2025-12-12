@@ -20,6 +20,8 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Added
 
+- Initial release
+
 ### Changed
 
 ### Deprecated
@@ -30,6 +32,6 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Security
 
-## [0.1.0] - 2025-12-05
-
-- Initial release
+[Unreleased]: https://github.com/kettle-rb/psych-merge/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/kettle-rb/psych-merge/compare/3330d3309d6962a4e676aa1c43e4ca90dfd21dc4...v1.0.0
+[1.0.0t]: https://github.com/kettle-rb/psych-merge/tags/v1.0.0
