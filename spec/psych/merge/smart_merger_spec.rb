@@ -482,9 +482,9 @@ RSpec.describe Psych::Merge::SmartMerger do
       result = merger.merge
 
       # The key "cache" should appear exactly once
-      expect(result.scan(/^cache:/).length).to eq(1), 
+      expect(result.scan(/^cache:/).length).to eq(1),
         "Expected 'cache:' to appear once but got: #{result.inspect}"
-      
+
       # Verify the full structure is correct
       expect(result).to include("cache:")
       expect(result).to include("enabled: true")
@@ -513,7 +513,7 @@ RSpec.describe Psych::Merge::SmartMerger do
       merger2 = described_class.new(result1, result1)
       result2 = merger2.merge
 
-      expect(result2).to eq(result1), 
+      expect(result2).to eq(result1),
         "Merge should be idempotent.\nFirst: #{result1.inspect}\nSecond: #{result2.inspect}"
     end
   end

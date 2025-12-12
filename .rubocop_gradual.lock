@@ -1,0 +1,32 @@
+{
+  "bin/coverage_branches:2666843168": [
+    [55, 15, 4, "Security/Eval: The use of `eval` is a serious security risk.", 2087429787],
+    [60, 15, 4, "Security/Eval: The use of `eval` is a serious security risk.", 2087429787]
+  ],
+  "lib/psych/merge/debug_logger.rb:3264171687": [
+    [25, 7, 590, "Style/ClassMethodsDefinitions: Use `class << self` to define a class method.", 3314264098]
+  ],
+  "lib/psych/merge/file_analysis.rb:2653349123": [
+    [223, 11, 99, "Style/IdenticalConditionalBranches: Move `@freeze_blocks.each do |fb|\n            all_nodes << fb unless all_nodes.include?(fb)\n          end` out of the conditional.", 2167974299],
+    [231, 11, 99, "Style/IdenticalConditionalBranches: Move `@freeze_blocks.each do |fb|\n            all_nodes << fb unless all_nodes.include?(fb)\n          end` out of the conditional.", 2167974299]
+  ],
+  "spec/integration/reproducible_merge_spec.rb:2346429311": [
+    [6, 16, 26, "RSpec/DescribeClass: The first argument to describe should be the class or module being tested.", 3645308486]
+  ],
+  "spec/psych/merge/file_analysis_spec.rb:3462160747": [
+    [243, 3, 290, "RSpec/RepeatedExampleGroupDescription: Repeated describe block description on line(s) [336]", 2295203863],
+    [336, 3, 544, "RSpec/RepeatedExampleGroupDescription: Repeated describe block description on line(s) [243]", 1077335250],
+    [635, 3, 471, "RSpec/RepeatedExampleGroupDescription: Repeated describe block description on line(s) [701]", 52613095],
+    [657, 5, 157, "RSpec/RepeatedExample: Don't repeat examples within an example group. Repeated on line(s) 664.", 1251486447],
+    [664, 5, 257, "RSpec/RepeatedExample: Don't repeat examples within an example group. Repeated on line(s) 657.", 3798749146],
+    [701, 3, 308, "RSpec/RepeatedExampleGroupDescription: Repeated describe block description on line(s) [635]", 18471493]
+  ],
+  "spec/psych/merge/node_wrapper_spec.rb:2551880132": [
+    [253, 3, 471, "RSpec/RepeatedExampleGroupDescription: Repeated describe block description on line(s) [522]", 1418053681],
+    [313, 7, 207, "RSpec/LeakyConstantDeclaration: Stub class constant instead of declaring explicitly.", 1257868205],
+    [491, 7, 54, "RSpec/ReceiveMessages: Use `receive_messages` instead of multiple stubs on lines [492, 494].", 4121081400],
+    [492, 7, 52, "RSpec/ReceiveMessages: Use `receive_messages` instead of multiple stubs on lines [491, 494].", 2040498192],
+    [494, 7, 53, "RSpec/ReceiveMessages: Use `receive_messages` instead of multiple stubs on lines [491, 492].", 3261532250],
+    [522, 3, 294, "RSpec/RepeatedExampleGroupDescription: Repeated describe block description on line(s) [253]", 3338410537]
+  ]
+}

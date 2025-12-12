@@ -200,7 +200,7 @@ module Psych
         ?add_template_only_nodes: bool,
         ?freeze_token: String,
         ?signature_generator: (^(untyped) -> Array[untyped]?)?,
-        ?node_splitter: (Hash[Symbol, untyped])?
+        ?node_splitter: Hash[Symbol, untyped]?
       ) -> void
 
       def merge: () -> MergeResult

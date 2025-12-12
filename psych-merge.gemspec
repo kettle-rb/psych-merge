@@ -97,7 +97,7 @@ Gem::Specification.new do |spec|
   # Listed files are the relative paths from bindir above.
   spec.executables = []
 
-    # Parser and AST infrastructure
+  # Parser and AST infrastructure
   spec.add_dependency("psych", "~> 5.0")                                # ruby >= 2.5.0
 
   # Shared merge infrastructure
