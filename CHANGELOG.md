@@ -20,6 +20,10 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Added
 
+- `node_typing` parameter for per-node-type merge preferences
+  - Enables `preference: { default: :destination, special_type: :template }` pattern
+  - Works with custom merge_types assigned via node_typing lambdas
+- `regions` and `region_placeholder` parameters for nested content merging
 - Initial release
 
 ### Changed

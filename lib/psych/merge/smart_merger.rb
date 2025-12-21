@@ -50,6 +50,8 @@ module Psych
       #   Set to MappingMatchRefiner.new to enable fuzzy key matching.
       # @param regions [Array<Hash>, nil] Region configurations for nested merging
       # @param region_placeholder [String, nil] Custom placeholder for regions
+      # @param node_typing [Hash{Symbol,String => #call}, nil] Node typing configuration
+      #   for per-node-type merge preferences
       #
       # @raise [TemplateParseError] If template has syntax errors
       # @raise [DestinationParseError] If destination has syntax errors
@@ -62,7 +64,8 @@ module Psych
         freeze_token: FileAnalysis::DEFAULT_FREEZE_TOKEN,
         match_refiner: nil,
         regions: nil,
-        region_placeholder: nil
+        region_placeholder: nil,
+        node_typing: nil
       )
         super(
           template_content,
@@ -74,6 +77,7 @@ module Psych
           match_refiner: match_refiner,
           regions: regions,
           region_placeholder: region_placeholder,
+          node_typing: node_typing,
         )
       end
 
