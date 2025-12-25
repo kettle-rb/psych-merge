@@ -23,8 +23,9 @@ module Psych
       attr_reader :statistics
 
       # Initialize a new merge result
-      def initialize
-        super
+      # @param options [Hash] Additional options for forward compatibility
+      def initialize(**options)
+        super(**options)
         @statistics = {
           template_lines: 0,
           dest_lines: 0,

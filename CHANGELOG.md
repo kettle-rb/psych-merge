@@ -28,6 +28,13 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Changed
 
+- **SmartMerger**: Added `**options` for forward compatibility
+  - Accepts additional options that may be added to base class in future
+  - Passes all options through to `SmartMergerBase`
+- **ConflictResolver**: Added `**options` for forward compatibility
+  - Now passes `match_refiner` to base class instead of storing locally
+- **MergeResult**: Added `**options` for forward compatibility
+
 ### Deprecated
 
 ### Removed
