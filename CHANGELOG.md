@@ -20,6 +20,26 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.0.0] - 2026-02-19
+
+- TAG: [v1.0.0][1.0.0t]
+- COVERAGE: 91.92% -- 921/1002 lines in 14 files
+- BRANCH COVERAGE: 73.00% -- 311/426 branches in 14 files
+- 97.39% documented
+
+### Added
+
+- AGENTS.md
 - `Psych::Merge::DiffMapper` - Maps unified git diffs to YAML AST key paths
   - Inherits from `Ast::Merge::DiffMapperBase`
   - `#map_hunk_to_paths` - Maps diff hunks to YAML key paths (e.g., `["AllCops", "Exclude"]`)
@@ -55,8 +75,15 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Changed
 
-- Upgrade to [ast-merge v4.0.5](https://github.com/kettle-rb/ast-merge/releases/tag/v4.0.5)
-- Upgrade to [tree_haver v5.0.3](https://github.com/kettle-rb/tree_haver/releases/tag/v5.0.3)
+- appraisal2 v3.0.6
+- kettle-test v1.0.10
+- stone_checksums v1.0.3
+- [ast-merge v4.0.6](https://github.com/kettle-rb/ast-merge/releases/tag/v4.0.6)
+- [tree_haver v5.0.5](https://github.com/kettle-rb/tree_haver/releases/tag/v5.0.5)
+- tree_stump v0.2.0
+  - fork no longer required, updates all applied upstream
+- Updated documentation on hostile takeover of RubyGems
+  - https://dev.to/galtzo/hostile-takeover-of-rubygems-my-thoughts-5hlo
 - **SmartMerger**: Added `**options` for forward compatibility
   - Accepts additional options that may be added to base class in future
   - Passes all options through to `SmartMergerBase`
@@ -65,10 +92,6 @@ Please file a bug if you notice a violation of semantic versioning.
 - **MergeResult**: Added `**options` for forward compatibility
 - Updated documentation on hostile takeover of RubyGems
   - https://dev.to/galtzo/hostile-takeover-of-rubygems-my-thoughts-5hlo
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
