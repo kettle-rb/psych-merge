@@ -88,6 +88,7 @@ module Psych
 
     autoload :CommentTracker, "psych/merge/comment_tracker"
     autoload :DebugLogger, "psych/merge/debug_logger"
+    autoload :DiffMapper, "psych/merge/diff_mapper"
     autoload :Emitter, "psych/merge/emitter"
     autoload :FreezeNode, "psych/merge/freeze_node"
     autoload :FileAnalysis, "psych/merge/file_analysis"
@@ -95,9 +96,22 @@ module Psych
     autoload :MergeResult, "psych/merge/merge_result"
     autoload :NodeWrapper, "psych/merge/node_wrapper"
     autoload :ConflictResolver, "psych/merge/conflict_resolver"
+    autoload :PartialTemplateMerger, "psych/merge/partial_template_merger"
     autoload :SmartMerger, "psych/merge/smart_merger"
     autoload :MappingMatchRefiner, "psych/merge/mapping_match_refiner"
   end
+end
+
+# Register with ast-merge's MergeGemRegistry for RSpec dependency tags
+# Only register if MergeGemRegistry is loaded (i.e., in test environment)
+if defined?(Ast::Merge::RSpec::MergeGemRegistry)
+  Ast::Merge::RSpec::MergeGemRegistry.register(
+    :psych_merge,
+    require_path: "psych/merge",
+    merger_class: "Psych::Merge::SmartMerger",
+    test_source: "key: value",
+    category: :config,
+  )
 end
 
 Psych::Merge::Version.class_eval do

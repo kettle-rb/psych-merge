@@ -220,19 +220,14 @@ module Psych
               comment_tracker: @comment_tracker,
             )
           end
-
-          # Add any remaining freeze blocks at the end
-          @freeze_blocks.each do |fb|
-            all_nodes << fb unless all_nodes.include?(fb)
-          end
         else
           # For sequences or scalars at root, wrap the whole thing
           all_nodes << NodeWrapper.new(root, lines: @lines)
+        end
 
-          # Integrate freeze blocks
-          @freeze_blocks.each do |fb|
-            all_nodes << fb unless all_nodes.include?(fb)
-          end
+        # Add any remaining freeze blocks at the end (common to both branches)
+        @freeze_blocks.each do |fb|
+          all_nodes << fb unless all_nodes.include?(fb)
         end
 
         all_nodes.sort_by { |n| n.start_line || 0 }

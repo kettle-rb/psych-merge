@@ -517,4 +517,211 @@ RSpec.describe Psych::Merge::SmartMerger do
         "Merge should be idempotent.\nFirst: #{result1.inspect}\nSecond: #{result2.inspect}"
     end
   end
+
+  describe "recursive merge" do
+    context "with recursive: true (default)" do
+      it "merges nested mapping entries recursively" do
+        template = <<~YAML
+          AllCops:
+            Exclude:
+              - examples/**/*
+            NewCops: enable
+        YAML
+
+        dest = <<~YAML
+          AllCops:
+            Exclude:
+              - tmp/**/*
+            TargetRubyVersion: 3.2
+        YAML
+
+        merger = described_class.new(
+          template,
+          dest,
+          recursive: true,
+          add_template_only_nodes: true,
+        )
+        result = merger.merge
+
+        # Should keep destination's TargetRubyVersion
+        expect(result).to include("TargetRubyVersion: 3.2")
+        # Should add template's NewCops
+        expect(result).to include("NewCops: enable")
+        # Should have AllCops appear once
+        expect(result.scan(/^AllCops:/).length).to eq(1)
+      end
+
+      it "merges sequence items with union semantics when add_template_only_nodes is true" do
+        template = <<~YAML
+          AllCops:
+            Exclude:
+              - examples/**/*
+              - vendor/**/*
+        YAML
+
+        dest = <<~YAML
+          AllCops:
+            Exclude:
+              - tmp/**/*
+              - coverage/**/*
+        YAML
+
+        merger = described_class.new(
+          template,
+          dest,
+          recursive: true,
+          add_template_only_nodes: true,
+        )
+        result = merger.merge
+
+        # Should have all items from both (union)
+        expect(result).to include("tmp/**/*")
+        expect(result).to include("coverage/**/*")
+        expect(result).to include("examples/**/*")
+        expect(result).to include("vendor/**/*")
+      end
+
+      it "keeps only destination sequence items when add_template_only_nodes is false" do
+        template = <<~YAML
+          AllCops:
+            Exclude:
+              - examples/**/*
+              - vendor/**/*
+        YAML
+
+        dest = <<~YAML
+          AllCops:
+            Exclude:
+              - tmp/**/*
+              - coverage/**/*
+        YAML
+
+        merger = described_class.new(
+          template,
+          dest,
+          recursive: true,
+          add_template_only_nodes: false,
+        )
+        result = merger.merge
+
+        # Should have only destination items
+        expect(result).to include("tmp/**/*")
+        expect(result).to include("coverage/**/*")
+        expect(result).not_to include("examples/**/*")
+        expect(result).not_to include("vendor/**/*")
+      end
+    end
+
+    context "with recursive: false" do
+      it "replaces entire nested structure based on preference" do
+        template = <<~YAML
+          AllCops:
+            NewCops: enable
+        YAML
+
+        dest = <<~YAML
+          AllCops:
+            TargetRubyVersion: 3.2
+        YAML
+
+        merger = described_class.new(
+          template,
+          dest,
+          recursive: false,
+          preference: :destination,
+        )
+        result = merger.merge
+
+        # With recursive: false and preference: destination,
+        # the entire AllCops block comes from destination
+        expect(result).to include("TargetRubyVersion: 3.2")
+        expect(result).not_to include("NewCops")
+      end
+    end
+
+    context "with recursive: Integer (depth limit)" do
+      it "raises ArgumentError for recursive: 0" do
+        expect {
+          described_class.new("key: value", "key: value", recursive: 0)
+        }.to raise_error(ArgumentError, /recursive: 0 is invalid/)
+      end
+
+      it "accepts positive integers for depth limit" do
+        merger = described_class.new("key: value", "key: value", recursive: 2)
+        expect(merger.recursive).to eq(2)
+      end
+    end
+  end
+
+  describe "remove_template_missing_nodes" do
+    it "removes destination-only nodes when enabled" do
+      template = <<~YAML
+        keep_me: value
+      YAML
+
+      dest = <<~YAML
+        keep_me: dest_value
+        remove_me: should_be_gone
+      YAML
+
+      merger = described_class.new(
+        template,
+        dest,
+        remove_template_missing_nodes: true,
+      )
+      result = merger.merge
+
+      expect(result).to include("keep_me")
+      expect(result).not_to include("remove_me")
+      expect(result).not_to include("should_be_gone")
+    end
+
+    it "keeps destination-only nodes when disabled (default)" do
+      template = <<~YAML
+        keep_me: value
+      YAML
+
+      dest = <<~YAML
+        keep_me: dest_value
+        extra: stays
+      YAML
+
+      merger = described_class.new(
+        template,
+        dest,
+        remove_template_missing_nodes: false,
+      )
+      result = merger.merge
+
+      expect(result).to include("keep_me")
+      expect(result).to include("extra")
+      expect(result).to include("stays")
+    end
+
+    it "removes sequence items not in template when enabled with recursive" do
+      template = <<~YAML
+        AllCops:
+          Exclude:
+            - keep_this/**/*
+      YAML
+
+      dest = <<~YAML
+        AllCops:
+          Exclude:
+            - keep_this/**/*
+            - remove_this/**/*
+      YAML
+
+      merger = described_class.new(
+        template,
+        dest,
+        recursive: true,
+        remove_template_missing_nodes: true,
+      )
+      result = merger.merge
+
+      expect(result).to include("keep_this/**/*")
+      expect(result).not_to include("remove_this/**/*")
+    end
+  end
 end

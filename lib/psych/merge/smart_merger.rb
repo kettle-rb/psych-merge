@@ -20,6 +20,15 @@ module Psych
     #   )
     #   result = merger.merge
     #
+    # @example Recursive merge with template additions
+    #   merger = SmartMerger.new(
+    #     template_yaml,
+    #     dest_yaml,
+    #     recursive: true,
+    #     add_template_only_nodes: true
+    #   )
+    #   # Nested structures are merged recursively, template-only items added
+    #
     # @example With custom signature generator
     #   sig_gen = ->(node) {
     #     if node.is_a?(MappingEntry) && node.key_name == "version"
@@ -44,6 +53,11 @@ module Psych
       #   - :destination (default) - Keep destination version (customizations)
       #   - :template - Use template version (updates)
       # @param add_template_only_nodes [Boolean] Whether to add nodes only in template
+      # @param remove_template_missing_nodes [Boolean] Whether to remove destination nodes not in template
+      # @param recursive [Boolean, Integer] Whether to merge nested structures recursively
+      #   - true: unlimited depth (default)
+      #   - false: disabled
+      #   - Integer > 0: max depth
       # @param freeze_token [String] Token for freeze block markers
       # @param match_refiner [#call, nil] Optional match refiner for fuzzy matching of
       #   unmatched nodes. Default: nil (fuzzy matching disabled).
@@ -62,6 +76,8 @@ module Psych
         signature_generator: nil,
         preference: :destination,
         add_template_only_nodes: false,
+        remove_template_missing_nodes: false,
+        recursive: true,
         freeze_token: FileAnalysis::DEFAULT_FREEZE_TOKEN,
         match_refiner: nil,
         regions: nil,
@@ -69,6 +85,8 @@ module Psych
         node_typing: nil,
         **options
       )
+        @remove_template_missing_nodes = remove_template_missing_nodes
+        @recursive = recursive
         super(
           template_content,
           dest_content,
@@ -83,6 +101,12 @@ module Psych
           **options
         )
       end
+
+      # @return [Boolean] Whether to remove destination nodes not in template
+      attr_reader :remove_template_missing_nodes
+
+      # @return [Boolean, Integer] Whether to merge nested structures recursively
+      attr_reader :recursive
 
       # Perform the merge and return the result as a YAML string.
       #
@@ -174,7 +198,10 @@ module Psych
           @dest_analysis,
           preference: @preference,
           add_template_only_nodes: @add_template_only_nodes,
+          remove_template_missing_nodes: @remove_template_missing_nodes,
+          recursive: @recursive,
           match_refiner: @match_refiner,
+          node_typing: @node_typing,
         )
       end
 

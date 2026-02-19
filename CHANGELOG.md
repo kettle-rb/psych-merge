@@ -20,6 +20,33 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Added
 
+- `Psych::Merge::DiffMapper` - Maps unified git diffs to YAML AST key paths
+  - Inherits from `Ast::Merge::DiffMapperBase`
+  - `#map_hunk_to_paths` - Maps diff hunks to YAML key paths (e.g., `["AllCops", "Exclude"]`)
+  - `#create_analysis` - Creates `FileAnalysis` for YAML content
+  - Tracks nested paths via indentation and MappingEntry location data
+  - Groups consecutive changed lines by their containing YAML node
+- `Psych::Merge::PartialTemplateMerger` - Merges partial YAML templates into specific key paths
+  - Navigate to specific key paths (e.g., `["AllCops", "Exclude"]`) in destination
+  - Merge template content at that location while preserving rest of document
+  - `key_path:` - Array of keys/indices to navigate to target location
+  - `add_missing:` - Whether to add template items not in destination (default: `true`)
+  - `remove_missing:` - Whether to remove destination items not in template (default: `false`)
+  - `when_missing:` - Behavior when key path not found (`:skip` or `:add`, default: `:skip`)
+  - `recursive:` - Whether to recursively merge nested structures (default: `true`)
+  - Returns `Result` object with `content`, `has_key_path`, `changed`, `stats`, `message`
+- `Psych::Merge::SmartMerger` - New options for advanced merge control:
+  - `recursive: true | false | Integer` - Control recursive merging of nested structures
+    - `true` (default): Merge nested mappings/sequences recursively instead of replacing wholesale
+    - `false`: Replace entire matched nodes (original behavior)
+    - `Integer > 0`: Maximum recursion depth
+  - `remove_template_missing_nodes: false` - When `true`, removes destination nodes not present in template
+- `Psych::Merge::ConflictResolver` - Recursive merge implementation:
+  - `#emit_recursive_merge` - Recursively merge matched nodes
+  - `#emit_recursive_mapping_merge` - Merge nested mapping entries
+  - `#emit_recursive_sequence_merge` - Merge sequences with union semantics
+  - `#can_merge_recursively?` - Check if two nodes can be recursively merged
+  - Handles both `MappingEntry` and raw `NodeWrapper` nodes
 - `node_typing` parameter for per-node-type merge preferences
   - Enables `preference: { default: :destination, special_type: :template }` pattern
   - Works with custom merge_types assigned via node_typing lambdas
@@ -28,6 +55,8 @@ Please file a bug if you notice a violation of semantic versioning.
 
 ### Changed
 
+- Upgrade to [ast-merge v4.0.5](https://github.com/kettle-rb/ast-merge/releases/tag/v4.0.5)
+- Upgrade to [tree_haver v5.0.3](https://github.com/kettle-rb/tree_haver/releases/tag/v5.0.3)
 - **SmartMerger**: Added `**options` for forward compatibility
   - Accepts additional options that may be added to base class in future
   - Passes all options through to `SmartMergerBase`
@@ -42,6 +71,8 @@ Please file a bug if you notice a violation of semantic versioning.
 ### Removed
 
 ### Fixed
+
+- ConflictResolver now applies Hash-based per-node-type preferences via `node_typing`.
 
 ### Security
 

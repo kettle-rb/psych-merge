@@ -309,8 +309,8 @@ RSpec.describe Psych::Merge::NodeWrapper do
       ast = Psych.parse_stream(simple_yaml)
       _doc = ast.children.first
 
-      # Create wrapper with node that doesn't have line info
-      class FakeNode
+      # Create wrapper with node that doesn't have line info using stub_const
+      fake_node_class = Class.new do
         def start_line = nil
         def end_line = nil
 
@@ -318,6 +318,7 @@ RSpec.describe Psych::Merge::NodeWrapper do
           [:start_line, :end_line].include?(method) || super
         end
       end
+      stub_const("FakeNode", fake_node_class)
 
       wrapper = described_class.new(FakeNode.new, lines: lines)
       expect(wrapper.content).to eq("")
@@ -486,10 +487,13 @@ RSpec.describe Psych::Merge::NodeWrapper do
 
     it "adjusts end_line to match start_line when end is before start" do
       mock_node = double("node")
+      allow(mock_node).to receive_messages(
+        start_line: 5,
+        end_line: 2,  # end before start
+        anchor: nil,
+      )
       allow(mock_node).to receive(:respond_to?).with(:start_line).and_return(true)
       allow(mock_node).to receive(:respond_to?).with(:end_line).and_return(true)
-      allow(mock_node).to receive(:start_line).and_return(5)
-      allow(mock_node).to receive(:end_line).and_return(2)  # end before start
       allow(mock_node).to receive(:respond_to?).with(:anchor).and_return(false)
       allow(mock_node).to receive(:is_a?).and_return(false)
 
@@ -519,7 +523,7 @@ RSpec.describe Psych::Merge::NodeWrapper do
     end
   end
 
-  describe "#alias_anchor" do
+  describe "#alias_anchor for non-alias nodes" do
     it "returns nil for non-alias nodes" do
       ast = Psych.parse_stream(simple_yaml)
       doc = ast.children.first

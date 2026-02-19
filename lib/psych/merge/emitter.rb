@@ -6,26 +6,27 @@ module Psych
     # This class provides utilities for emitting YAML while maintaining
     # the original structure, comments, and style choices.
     #
+    # Inherits common emitter functionality from Ast::Merge::EmitterBase.
+    #
     # @example Basic usage
     #   emitter = Emitter.new
     #   emitter.emit_mapping_entry(key, value, leading_comments: comments)
-    class Emitter
-      # @return [Array<String>] Output lines
-      attr_reader :lines
+    class Emitter < Ast::Merge::EmitterBase
+      # Initialize subclass-specific state
+      def initialize_subclass_state(**options)
+        # YAML doesn't need comma tracking like JSON
+      end
 
-      # @return [Integer] Current indentation level
-      attr_reader :indent_level
+      # Clear subclass-specific state
+      def clear_subclass_state
+        # Nothing to clear for YAML
+      end
 
-      # @return [Integer] Spaces per indent level
-      attr_reader :indent_size
-
-      # Initialize a new emitter
-      #
-      # @param indent_size [Integer] Number of spaces per indent level
-      def initialize(indent_size: 2)
-        @lines = []
-        @indent_level = 0
-        @indent_size = indent_size
+      # Emit a tracked comment from CommentTracker
+      # @param comment [Hash] Comment with :text, :indent
+      def emit_tracked_comment(comment)
+        indent = " " * (comment[:indent] || 0)
+        @lines << "#{indent}# #{comment[:text]}"
       end
 
       # Emit a comment line
@@ -41,22 +42,6 @@ module Psych
         else
           @lines << "#{current_indent}# #{text}"
         end
-      end
-
-      # Emit leading comments
-      #
-      # @param comments [Array<Hash>] Comment hashes from CommentTracker
-      def emit_leading_comments(comments)
-        comments.each do |comment|
-          # Preserve original indentation from comment
-          indent = " " * (comment[:indent] || 0)
-          @lines << "#{indent}# #{comment[:text]}"
-        end
-      end
-
-      # Emit a blank line
-      def emit_blank_line
-        @lines << ""
       end
 
       # Emit a scalar value
@@ -79,12 +64,12 @@ module Psych
       def emit_mapping_start(key, anchor: nil)
         anchor_str = anchor ? " &#{anchor}" : ""
         @lines << "#{current_indent}#{key}:#{anchor_str}"
-        @indent_level += 1
+        indent
       end
 
       # Emit a mapping end
       def emit_mapping_end
-        @indent_level -= 1 if @indent_level > 0
+        dedent
       end
 
       # Emit a sequence start
@@ -95,7 +80,7 @@ module Psych
         if key
           anchor_str = anchor ? " &#{anchor}" : ""
           @lines << "#{current_indent}#{key}:#{anchor_str}"
-          @indent_level += 1
+          indent
         end
       end
 
@@ -111,7 +96,7 @@ module Psych
 
       # Emit a sequence end
       def emit_sequence_end
-        @indent_level -= 1 if @indent_level > 0
+        dedent
       end
 
       # Emit an alias reference
@@ -129,33 +114,14 @@ module Psych
         @lines << "#{current_indent}<<: *#{anchor}"
       end
 
-      # Emit raw lines (for preserving existing content)
-      #
-      # @param raw_lines [Array<String>] Lines to emit as-is
-      def emit_raw_lines(raw_lines)
-        raw_lines.each { |line| @lines << line.chomp }
-      end
-
-      # Get the output as a single string
+      # Get the output as a YAML string
       #
       # @return [String]
       def to_yaml
-        content = @lines.join("\n")
-        content += "\n" unless content.empty? || content.end_with?("\n")
-        content
-      end
-
-      # Clear the output
-      def clear
-        @lines = []
-        @indent_level = 0
+        to_s
       end
 
       private
-
-      def current_indent
-        " " * (@indent_level * @indent_size)
-      end
 
       def format_scalar(value, style)
         case style
