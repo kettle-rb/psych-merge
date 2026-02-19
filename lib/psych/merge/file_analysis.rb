@@ -30,12 +30,14 @@ module Psych
       # @param source [String] YAML source code to analyze
       # @param freeze_token [String] Token for freeze block markers
       # @param signature_generator [Proc, nil] Custom signature generator
-      def initialize(source, freeze_token: DEFAULT_FREEZE_TOKEN, signature_generator: nil)
+      # @param options [Hash] Additional options (forward compatibility - ignored by FileAnalysis)
+      def initialize(source, freeze_token: DEFAULT_FREEZE_TOKEN, signature_generator: nil, **options)
         @source = source
         @lines = source.lines.map(&:chomp)
         @freeze_token = freeze_token
         @signature_generator = signature_generator
         @errors = []
+        # **options captures any additional parameters (e.g., node_typing) for forward compatibility
 
         # Initialize comment tracking
         @comment_tracker = CommentTracker.new(source)
@@ -218,19 +220,14 @@ module Psych
               comment_tracker: @comment_tracker,
             )
           end
-
-          # Add any remaining freeze blocks at the end
-          @freeze_blocks.each do |fb|
-            all_nodes << fb unless all_nodes.include?(fb)
-          end
         else
           # For sequences or scalars at root, wrap the whole thing
           all_nodes << NodeWrapper.new(root, lines: @lines)
+        end
 
-          # Integrate freeze blocks
-          @freeze_blocks.each do |fb|
-            all_nodes << fb unless all_nodes.include?(fb)
-          end
+        # Add any remaining freeze blocks at the end (common to both branches)
+        @freeze_blocks.each do |fb|
+          all_nodes << fb unless all_nodes.include?(fb)
         end
 
         all_nodes.sort_by { |n| n.start_line || 0 }

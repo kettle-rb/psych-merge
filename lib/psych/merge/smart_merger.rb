@@ -20,6 +20,15 @@ module Psych
     #   )
     #   result = merger.merge
     #
+    # @example Recursive merge with template additions
+    #   merger = SmartMerger.new(
+    #     template_yaml,
+    #     dest_yaml,
+    #     recursive: true,
+    #     add_template_only_nodes: true
+    #   )
+    #   # Nested structures are merged recursively, template-only items added
+    #
     # @example With custom signature generator
     #   sig_gen = ->(node) {
     #     if node.is_a?(MappingEntry) && node.key_name == "version"
@@ -44,12 +53,20 @@ module Psych
       #   - :destination (default) - Keep destination version (customizations)
       #   - :template - Use template version (updates)
       # @param add_template_only_nodes [Boolean] Whether to add nodes only in template
+      # @param remove_template_missing_nodes [Boolean] Whether to remove destination nodes not in template
+      # @param recursive [Boolean, Integer] Whether to merge nested structures recursively
+      #   - true: unlimited depth (default)
+      #   - false: disabled
+      #   - Integer > 0: max depth
       # @param freeze_token [String] Token for freeze block markers
       # @param match_refiner [#call, nil] Optional match refiner for fuzzy matching of
       #   unmatched nodes. Default: nil (fuzzy matching disabled).
       #   Set to MappingMatchRefiner.new to enable fuzzy key matching.
       # @param regions [Array<Hash>, nil] Region configurations for nested merging
       # @param region_placeholder [String, nil] Custom placeholder for regions
+      # @param node_typing [Hash{Symbol,String => #call}, nil] Node typing configuration
+      #   for per-node-type merge preferences
+      # @param options [Hash] Additional options for forward compatibility
       #
       # @raise [TemplateParseError] If template has syntax errors
       # @raise [DestinationParseError] If destination has syntax errors
@@ -59,11 +76,17 @@ module Psych
         signature_generator: nil,
         preference: :destination,
         add_template_only_nodes: false,
+        remove_template_missing_nodes: false,
+        recursive: true,
         freeze_token: FileAnalysis::DEFAULT_FREEZE_TOKEN,
         match_refiner: nil,
         regions: nil,
-        region_placeholder: nil
+        region_placeholder: nil,
+        node_typing: nil,
+        **options
       )
+        @remove_template_missing_nodes = remove_template_missing_nodes
+        @recursive = recursive
         super(
           template_content,
           dest_content,
@@ -74,8 +97,16 @@ module Psych
           match_refiner: match_refiner,
           regions: regions,
           region_placeholder: region_placeholder,
+          node_typing: node_typing,
+          **options
         )
       end
+
+      # @return [Boolean] Whether to remove destination nodes not in template
+      attr_reader :remove_template_missing_nodes
+
+      # @return [Boolean, Integer] Whether to merge nested structures recursively
+      attr_reader :recursive
 
       # Perform the merge and return the result as a YAML string.
       #
@@ -167,7 +198,10 @@ module Psych
           @dest_analysis,
           preference: @preference,
           add_template_only_nodes: @add_template_only_nodes,
+          remove_template_missing_nodes: @remove_template_missing_nodes,
+          recursive: @recursive,
           match_refiner: @match_refiner,
+          node_typing: @node_typing,
         )
       end
 

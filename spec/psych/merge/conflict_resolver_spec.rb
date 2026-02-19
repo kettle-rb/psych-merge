@@ -141,6 +141,34 @@ RSpec.describe Psych::Merge::ConflictResolver do
       end
     end
 
+    context "with per-node-type preference" do
+      it "uses template values for typed nodes and destination for others" do
+        node_typing = {
+          "MappingEntry" => lambda { |node|
+            if node.key_name == "key2"
+              Ast::Merge::NodeTyping.with_merge_type(node, :special_key)
+            else
+              node
+            end
+          },
+        }
+
+        resolver = described_class.new(
+          template_analysis,
+          dest_analysis,
+          preference: {default: :destination, special_key: :template},
+          node_typing: node_typing,
+        )
+        result = Psych::Merge::MergeResult.new
+
+        resolver.resolve(result)
+        yaml = result.to_yaml
+
+        expect(yaml).to include("key1: dest_value1")
+        expect(yaml).to include("key2: template_value2")
+      end
+    end
+
     context "with add_template_only_nodes enabled" do
       it "adds template-only keys" do
         resolver = described_class.new(

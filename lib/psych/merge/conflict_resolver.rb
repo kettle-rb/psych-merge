@@ -12,27 +12,48 @@ module Psych
     #   resolver = ConflictResolver.new(template_analysis, dest_analysis)
     #   resolver.resolve(result)
     #
+    # @example With recursive merge for nested structures
+    #   resolver = ConflictResolver.new(
+    #     template_analysis,
+    #     dest_analysis,
+    #     recursive: true,
+    #     add_template_only_nodes: true
+    #   )
+    #
     # @see Ast::Merge::ConflictResolverBase
     class ConflictResolver < Ast::Merge::ConflictResolverBase
       # Creates a new ConflictResolver
       #
       # @param template_analysis [FileAnalysis] Analyzed template file
       # @param dest_analysis [FileAnalysis] Analyzed destination file
-      # @param preference [Symbol] Which version to prefer when
+      # @param preference [Symbol, Hash] Which version to prefer when
       #   nodes have matching signatures:
       #   - :destination (default) - Keep destination version (customizations)
       #   - :template - Use template version (updates)
       # @param add_template_only_nodes [Boolean] Whether to add nodes only in template
+      # @param remove_template_missing_nodes [Boolean] Whether to remove destination nodes not in template
+      # @param recursive [Boolean, Integer] Whether to merge nested structures recursively
+      #   - true: unlimited depth (default)
+      #   - false: disabled
+      #   - Integer > 0: max depth
       # @param match_refiner [#call, nil] Optional match refiner for fuzzy matching
-      def initialize(template_analysis, dest_analysis, preference: :destination, add_template_only_nodes: false, match_refiner: nil)
+      # @param options [Hash] Additional options for forward compatibility
+      # @param node_typing [Hash{Symbol,String => #call}, nil] Node typing configuration
+      #   for per-node-type preferences
+      def initialize(template_analysis, dest_analysis, preference: :destination, add_template_only_nodes: false, remove_template_missing_nodes: false, recursive: true, match_refiner: nil, node_typing: nil, **options)
         super(
           strategy: :batch,
           preference: preference,
           template_analysis: template_analysis,
           dest_analysis: dest_analysis,
-          add_template_only_nodes: add_template_only_nodes
+          add_template_only_nodes: add_template_only_nodes,
+          remove_template_missing_nodes: remove_template_missing_nodes,
+          recursive: recursive,
+          match_refiner: match_refiner,
+          **options
         )
-        @match_refiner = match_refiner
+        @node_typing = node_typing
+        @emitter = Emitter.new
       end
 
       protected
@@ -45,6 +66,9 @@ module Psych
           template_nodes = @template_analysis.statements
           dest_nodes = @dest_analysis.statements
 
+          # Clear emitter for fresh merge
+          @emitter.clear
+
           # Build signature maps
           template_by_sig = build_signature_map(template_nodes, @template_analysis)
           dest_by_sig = build_signature_map(dest_nodes, @dest_analysis)
@@ -56,16 +80,23 @@ module Psych
           processed_template_sigs = ::Set.new
           processed_dest_sigs = ::Set.new
 
-          # Process nodes in order, preferring destination order when nodes match
-          merge_nodes(
+          # Process nodes via emitter
+          merge_nodes_to_emitter(
             template_nodes,
             dest_nodes,
             template_by_sig,
             dest_by_sig,
             processed_template_sigs,
             processed_dest_sigs,
-            result,
           )
+
+          # Transfer emitter output to result
+          emitted_content = @emitter.to_s
+          unless emitted_content.empty?
+            emitted_content.lines.each do |line|
+              result.add_line(line.chomp, decision: MergeResult::DECISION_MERGED, source: :merged)
+            end
+          end
 
           DebugLogger.debug("Conflict resolution complete", {
             template_nodes: template_nodes.size,
@@ -113,11 +144,7 @@ module Psych
         end
       end
 
-      def merge_nodes(template_nodes, dest_nodes, template_by_sig, dest_by_sig, processed_template_sigs, processed_dest_sigs, result)
-        # Determine the output order based on preference
-        # We'll iterate through destination nodes first (to preserve dest order for matches)
-        # then add any template-only nodes if configured
-
+      def merge_nodes_to_emitter(template_nodes, dest_nodes, template_by_sig, dest_by_sig, processed_template_sigs, processed_dest_sigs, depth: 0)
         # Build reverse lookup from dest_node to template_node for refined matches
         refined_dest_to_template = @refined_matches.invert
 
@@ -127,7 +154,7 @@ module Psych
 
           # Freeze blocks from destination are always preserved
           if freeze_node?(dest_node)
-            add_node_to_result(dest_node, result, :destination, MergeResult::DECISION_FREEZE_BLOCK)
+            emit_freeze_block(dest_node)
             processed_dest_sigs << dest_sig if dest_sig
             next
           end
@@ -138,11 +165,11 @@ module Psych
             template_info = template_by_sig[dest_sig].first
             template_node = template_info[:node]
 
-            # Decide which to keep based on preference
-            if @preference == :destination
-              add_node_to_result(dest_node, result, :destination, MergeResult::DECISION_KEPT_DEST)
+            # Check if we should recursively merge nested structures
+            if should_recurse?(depth) && can_merge_recursively?(template_node, dest_node)
+              emit_recursive_merge(template_node, dest_node, depth: depth)
             else
-              add_node_to_result(template_node, result, :template, MergeResult::DECISION_KEPT_TEMPLATE)
+              emit_preferred_node(template_node, dest_node)
             end
 
             processed_dest_sigs << dest_sig
@@ -152,18 +179,21 @@ module Psych
             template_node = refined_dest_to_template[dest_node]
             template_sig = @template_analysis.generate_signature(template_node)
 
-            # Decide which to keep based on preference
-            if @preference == :destination
-              add_node_to_result(dest_node, result, :destination, MergeResult::DECISION_KEPT_DEST)
+            # Check if we should recursively merge nested structures
+            if should_recurse?(depth) && can_merge_recursively?(template_node, dest_node)
+              emit_recursive_merge(template_node, dest_node, depth: depth)
             else
-              add_node_to_result(template_node, result, :template, MergeResult::DECISION_KEPT_TEMPLATE)
+              emit_preferred_node(template_node, dest_node)
             end
 
             processed_dest_sigs << dest_sig if dest_sig
             processed_template_sigs << template_sig if template_sig
           else
-            # Destination-only node - always keep
-            add_node_to_result(dest_node, result, :destination, MergeResult::DECISION_KEPT_DEST)
+            # Destination-only node
+            # If remove_template_missing_nodes is enabled, skip this node (remove it)
+            unless @remove_template_missing_nodes
+              emit_node(dest_node, @dest_analysis)
+            end
             processed_dest_sigs << dest_sig if dest_sig
           end
         end
@@ -177,45 +207,302 @@ module Psych
           # Skip if already processed (matched with dest)
           next if template_sig && processed_template_sigs.include?(template_sig)
 
-          # Skip freeze blocks from template (they shouldn't exist, but just in case)
+          # Skip freeze blocks from template
           next if freeze_node?(template_node)
 
           # Add template-only node
-          add_node_to_result(template_node, result, :template, MergeResult::DECISION_ADDED)
+          emit_node(template_node, @template_analysis)
           processed_template_sigs << template_sig if template_sig
         end
       end
 
-      def add_node_to_result(node, result, source, decision)
-        if freeze_node?(node)
-          result.add_freeze_block(node)
-        elsif node.is_a?(MappingEntry)
-          result.add_mapping_entry(node, decision: decision, source: source)
-        elsif node.is_a?(NodeWrapper)
-          add_wrapper_to_result(node, result, source, decision)
+      def emit_preferred_node(template_node, dest_node)
+        if preference_for_pair(template_node, dest_node) == :destination
+          emit_node(dest_node, @dest_analysis)
         else
-          DebugLogger.debug("Unknown node type", {node_type: node.class.name})
+          emit_node(template_node, @template_analysis)
         end
       end
 
-      def add_wrapper_to_result(wrapper, result, source, decision)
-        return unless wrapper.start_line && wrapper.end_line
+      def preference_for_pair(template_node, dest_node)
+        return @preference unless @preference.is_a?(Hash)
 
-        analysis = (source == :template) ? @template_analysis : @dest_analysis
+        typed_template = apply_node_typing(template_node)
+        typed_dest = apply_node_typing(dest_node)
 
-        # Include leading comments
-        leading = analysis.comment_tracker.leading_comments_before(wrapper.start_line)
-        leading.each do |comment|
-          result.add_line(comment[:raw], decision: decision, source: source, original_line: comment[:line])
+        if Ast::Merge::NodeTyping.typed_node?(typed_template)
+          merge_type = Ast::Merge::NodeTyping.merge_type_for(typed_template)
+          return @preference.fetch(merge_type) { default_preference } if merge_type
         end
 
-        # Add the node content
-        (wrapper.start_line..wrapper.end_line).each do |line_num|
-          line = analysis.line_at(line_num)
-          next unless line
-
-          result.add_line(line.chomp, decision: decision, source: source, original_line: line_num)
+        if Ast::Merge::NodeTyping.typed_node?(typed_dest)
+          merge_type = Ast::Merge::NodeTyping.merge_type_for(typed_dest)
+          return @preference.fetch(merge_type) { default_preference } if merge_type
         end
+
+        default_preference
+      end
+
+      def apply_node_typing(node)
+        return node unless @node_typing
+        return node unless node
+
+        Ast::Merge::NodeTyping.process(node, @node_typing)
+      end
+
+      # Check if two nodes can be merged recursively (both are mappings or sequences)
+      #
+      # @param template_node [MappingEntry, NodeWrapper] Template node
+      # @param dest_node [MappingEntry, NodeWrapper] Destination node
+      # @return [Boolean] Whether recursive merge is possible
+      def can_merge_recursively?(template_node, dest_node)
+        # Both must have nested mapping or sequence values
+        return false unless template_node.respond_to?(:mapping?) && dest_node.respond_to?(:mapping?)
+
+        (template_node.mapping? && dest_node.mapping?) ||
+          (template_node.sequence? && dest_node.sequence?)
+      end
+
+      # Emit a recursively merged node
+      #
+      # @param template_node [MappingEntry, NodeWrapper] Template node with nested structure
+      # @param dest_node [MappingEntry, NodeWrapper] Destination node with nested structure
+      # @param depth [Integer] Current recursion depth
+      def emit_recursive_merge(template_node, dest_node, depth:)
+        # Get the key line from destination (preserves formatting/comments)
+        # MappingEntry has a key attribute, NodeWrapper does not
+        if dest_node.respond_to?(:key) && dest_node.key
+          key_line = @dest_analysis.line_at(dest_node.key.start_line)
+          @emitter.emit_raw_lines([key_line]) if key_line
+        end
+
+        if template_node.mapping? && dest_node.mapping?
+          emit_recursive_mapping_merge(template_node, dest_node, depth: depth)
+        elsif template_node.sequence? && dest_node.sequence?
+          emit_recursive_sequence_merge(template_node, dest_node, depth: depth)
+        end
+      end
+
+      # Recursively merge two mapping values
+      #
+      # @param template_node [MappingEntry, NodeWrapper] Template node with mapping value
+      # @param dest_node [MappingEntry, NodeWrapper] Destination node with mapping value
+      # @param depth [Integer] Current recursion depth
+      def emit_recursive_mapping_merge(template_node, dest_node, depth:)
+        # Get the mapping node:
+        # - MappingEntry has .value which is a NodeWrapper wrapping the mapping
+        # - NodeWrapper that IS a mapping should be used directly
+        template_value = if template_node.respond_to?(:value) && template_node.value&.mapping?
+          template_node.value
+        elsif template_node.mapping?
+          template_node
+        end
+
+        return unless template_value
+
+        dest_value = if dest_node.respond_to?(:value) && dest_node.value&.mapping?
+          dest_node.value
+        elsif dest_node.mapping?
+          dest_node
+        end
+
+        return unless dest_value
+
+        # Get nested entries from both
+        template_entries = template_value.mapping_entries(comment_tracker: @template_analysis.comment_tracker)
+        dest_entries = dest_value.mapping_entries(comment_tracker: @dest_analysis.comment_tracker)
+
+        # Convert to MappingEntry objects for consistent handling
+        template_nested = template_entries.map do |key_wrapper, value_wrapper|
+          MappingEntry.new(
+            key: key_wrapper,
+            value: value_wrapper,
+            lines: @template_analysis.lines,
+            comment_tracker: @template_analysis.comment_tracker,
+          )
+        end
+
+        dest_nested = dest_entries.map do |key_wrapper, value_wrapper|
+          MappingEntry.new(
+            key: key_wrapper,
+            value: value_wrapper,
+            lines: @dest_analysis.lines,
+            comment_tracker: @dest_analysis.comment_tracker,
+          )
+        end
+
+        # Build signature maps for nested entries
+        nested_template_by_sig = {}
+        template_nested.each_with_index do |entry, idx|
+          sig = [:mapping_entry, entry.key_name]
+          nested_template_by_sig[sig] ||= []
+          nested_template_by_sig[sig] << {node: entry, index: idx}
+        end
+
+        nested_dest_by_sig = {}
+        dest_nested.each_with_index do |entry, idx|
+          sig = [:mapping_entry, entry.key_name]
+          nested_dest_by_sig[sig] ||= []
+          nested_dest_by_sig[sig] << {node: entry, index: idx}
+        end
+
+        # Recursively merge nested entries
+        processed_template_sigs = ::Set.new
+        processed_dest_sigs = ::Set.new
+
+        merge_nodes_to_emitter(
+          template_nested,
+          dest_nested,
+          nested_template_by_sig,
+          nested_dest_by_sig,
+          processed_template_sigs,
+          processed_dest_sigs,
+          depth: depth + 1,
+        )
+      end
+
+      # Recursively merge two sequence values (arrays)
+      # Uses union semantics: keeps all destination items, adds template-only items
+      #
+      # @param template_node [MappingEntry, NodeWrapper] Template node with sequence value
+      # @param dest_node [MappingEntry, NodeWrapper] Destination node with sequence value
+      # @param depth [Integer] Current recursion depth
+      def emit_recursive_sequence_merge(template_node, dest_node, depth:)
+        # Get the sequence node:
+        # - MappingEntry has .value which is a NodeWrapper wrapping the sequence
+        # - NodeWrapper that IS a sequence should be used directly
+        template_value = if template_node.respond_to?(:value) && template_node.value&.sequence?
+          template_node.value
+        elsif template_node.sequence?
+          template_node
+        end
+
+        dest_value = if dest_node.respond_to?(:value) && dest_node.value&.sequence?
+          dest_node.value
+        elsif dest_node.sequence?
+          dest_node
+        end
+
+        return unless template_value && dest_value
+
+        template_items = template_value.sequence_items(comment_tracker: @template_analysis.comment_tracker)
+        dest_items = dest_value.sequence_items(comment_tracker: @dest_analysis.comment_tracker)
+
+        # Build a set of destination scalar values for deduplication
+        dest_values = ::Set.new
+        dest_items.each do |item|
+          dest_values << item.value if item.scalar?
+        end
+
+        # First, emit all destination items (unless remove_template_missing_nodes)
+        if @remove_template_missing_nodes
+          # Only emit destination items that exist in template
+          template_values = ::Set.new
+          template_items.each do |item|
+            template_values << item.value if item.scalar?
+          end
+
+          dest_items.each do |item|
+            if item.scalar?
+              # Only keep if exists in template
+              if template_values.include?(item.value)
+                emit_sequence_item(item, @dest_analysis)
+              end
+            else
+              # Non-scalar items: keep by default (complex matching not implemented)
+              emit_sequence_item(item, @dest_analysis)
+            end
+          end
+        else
+          # Keep all destination items
+          dest_items.each do |item|
+            emit_sequence_item(item, @dest_analysis)
+          end
+        end
+
+        # If add_template_only_nodes, add template items not in destination
+        return unless @add_template_only_nodes
+
+        template_items.each do |item|
+          if item.scalar?
+            # Only add if not already in destination
+            unless dest_values.include?(item.value)
+              emit_sequence_item(item, @template_analysis)
+            end
+          else
+            # Non-scalar items: check by content/signature (simplified: always add)
+            # TODO: More sophisticated matching for nested objects in arrays
+            emit_sequence_item(item, @template_analysis)
+          end
+        end
+      end
+
+      # Emit a single sequence item
+      #
+      # @param item [NodeWrapper] Sequence item to emit
+      # @param analysis [FileAnalysis] Analysis for accessing source
+      def emit_sequence_item(item, analysis)
+        if item.start_line && item.end_line
+          lines = []
+          (item.start_line..item.end_line).each do |line_num|
+            line = analysis.line_at(line_num)
+            lines << line if line
+          end
+          @emitter.emit_raw_lines(lines)
+        end
+      end
+
+      # Emit a single node to the emitter
+      # @param node [NodeWrapper, MappingEntry] Node to emit
+      # @param analysis [FileAnalysis] Analysis for accessing source
+      def emit_node(node, analysis)
+        return if freeze_node?(node)
+
+        # Emit leading comments
+        if node.respond_to?(:start_line) && node.start_line
+          leading = analysis.comment_tracker.leading_comments_before(node.start_line)
+          leading.each do |comment|
+            @emitter.emit_tracked_comment(comment)
+          end
+        end
+
+        # Emit the node content
+        if node.is_a?(MappingEntry)
+          # MappingEntry has specific format
+          emit_mapping_entry(node, analysis)
+        elsif node.respond_to?(:start_line) && node.respond_to?(:end_line)
+          # Regular node - emit its lines
+          if node.start_line && node.end_line
+            lines = []
+            (node.start_line..node.end_line).each do |line_num|
+              line = analysis.line_at(line_num)
+              lines << line if line
+            end
+            @emitter.emit_raw_lines(lines)
+          end
+        end
+      end
+
+      # Emit a mapping entry
+      # @param entry [MappingEntry] The mapping entry
+      # @param analysis [FileAnalysis] Analysis for accessing source
+      def emit_mapping_entry(entry, analysis)
+        # MappingEntry should have key and value
+        # For now, emit as raw lines since we don't have full mapping entry structure
+        if entry.respond_to?(:start_line) && entry.respond_to?(:end_line)
+          lines = []
+          (entry.start_line..entry.end_line).each do |line_num|
+            line = analysis.line_at(line_num)
+            lines << line if line
+          end
+          @emitter.emit_raw_lines(lines)
+        end
+      end
+
+      # Emit a freeze block
+      # @param freeze_node [FreezeNode] Freeze block to emit
+      def emit_freeze_block(freeze_node)
+        @emitter.emit_raw_lines(freeze_node.lines)
       end
     end
   end

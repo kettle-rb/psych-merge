@@ -333,7 +333,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
     end
   end
 
-  describe "#root_mapping_entries" do
+  describe "#root_mapping_entries with empty YAML" do
     it "returns empty when AST has no children" do
       yaml = ""
       analysis = described_class.new(yaml)
@@ -632,7 +632,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
     end
   end
 
-  describe "#root_mapping_entries edge cases" do
+  describe "#root_mapping_entries for non-mapping YAML" do
     it "returns empty when doc is not a Document" do
       # Empty YAML
       yaml = ""
@@ -654,14 +654,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
   end
 
   describe "#root_node edge cases" do
-    it "returns nil when doc is not a Document" do
-      yaml = ""
-      analysis = described_class.new(yaml)
-
-      expect(analysis.root_node).to be_nil
-    end
-
-    it "returns nil when document has no meaningful root" do
+    it "returns nil when doc is not a Document or has no meaningful root" do
       # Empty YAML string - no content at all
       yaml = ""
       analysis = described_class.new(yaml)
@@ -698,7 +691,7 @@ RSpec.describe Psych::Merge::FileAnalysis do
     end
   end
 
-  describe "#root_mapping_entries edge cases" do
+  describe "#root_mapping_entries with valid mapping" do
     it "returns entries for valid mapping" do
       yaml = <<~YAML
         key1: value1

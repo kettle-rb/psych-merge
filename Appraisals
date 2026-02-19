@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # HOW TO UPDATE APPRAISALS (will run rubocop_gradual's autocorrect afterward):
-#   bin/rake appraisals:update
+#   bin/rake appraisal:update
 
 # Lock/Unlock Deps Pattern
 #
@@ -23,6 +23,7 @@ appraise "unlocked_deps" do
   eval_gemfile "modular/coverage.gemfile"
   eval_gemfile "modular/documentation.gemfile"
   eval_gemfile "modular/optional.gemfile"
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/style.gemfile"
   eval_gemfile "modular/x_std_libs.gemfile"
 end
@@ -32,54 +33,30 @@ end
 appraise "head" do
   # Why is gem "cgi" here? See: https://github.com/vcr/vcr/issues/1057
   #  gem "cgi", ">= 0.5"
-  gem "benchmark", "~> 0.4", ">= 0.4.1"
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/x_std_libs.gemfile"
 end
 
 # Used for current releases of ruby, truffleruby, and jruby.
 # Split into discrete appraisals if one of them needs a dependency locked discretely.
 appraise "current" do
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/x_std_libs.gemfile"
 end
 
 # Test current Rubies against head versions of runtime dependencies
 appraise "dep-heads" do
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/runtime_heads.gemfile"
 end
 
-appraise "ruby-2-3" do
-  eval_gemfile "modular/x_std_libs/r2.3/libs.gemfile"
-end
-
-appraise "ruby-2-4" do
-  eval_gemfile "modular/x_std_libs/r2.4/libs.gemfile"
-end
-
-appraise "ruby-2-5" do
-  eval_gemfile "modular/x_std_libs/r2.6/libs.gemfile"
-end
-
-appraise "ruby-2-6" do
-  eval_gemfile "modular/x_std_libs/r2.6/libs.gemfile"
-end
-
-appraise "ruby-2-7" do
-  eval_gemfile "modular/x_std_libs/r2/libs.gemfile"
-end
-
-appraise "ruby-3-0" do
-  eval_gemfile "modular/x_std_libs/r3.1/libs.gemfile"
-end
-
-appraise "ruby-3-1" do
-  eval_gemfile "modular/x_std_libs/r3.1/libs.gemfile"
-end
-
 appraise "ruby-3-2" do
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/x_std_libs/r3/libs.gemfile"
 end
 
 appraise "ruby-3-3" do
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/x_std_libs/r3/libs.gemfile"
 end
 
@@ -92,6 +69,7 @@ end
 appraise "coverage" do
   eval_gemfile "modular/coverage.gemfile"
   eval_gemfile "modular/optional.gemfile"
+  eval_gemfile "modular/rspec.gemfile"
   eval_gemfile "modular/x_std_libs.gemfile"
 end
 
